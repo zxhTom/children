@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+openai  # 预留给AI总结功能
+python-multipart # 用于处理图片和语音上传

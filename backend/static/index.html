@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宝贝成长日记 - 健康管理版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .theme-daughter { --bg-color: #fdf2f8; --primary: #db2777; --header-bg: #fbcfe8; }
+        .theme-son { --bg-color: #f0f9ff; --primary: #0284c7; --header-bg: #bae6fd; }
+        .theme-parent { --bg-color: #f4f4f5; --primary: #4f46e5; --header-bg: #e0e7ff; }
+        .theme-grandparent { --bg-color: #fffbeb; --primary: #d97706; --header-bg: #fef3c7; font-size: 110%; }
+
+        body { background-color: var(--bg-color); transition: background-color 0.3s; }
+        .header-area { background-color: var(--header-bg); transition: background-color 0.3s; }
+        .text-theme { color: var(--primary); }
+        .bg-theme { background-color: var(--primary); color: white; }
+        .border-theme { border-color: var(--primary); }
+        
+        .tab-active { border-bottom: 2px solid var(--primary); color: var(--primary); font-weight: bold; }
+        .tab-inactive { color: #6b7280; }
+        .tab-inactive:hover { color: #374151; }
+    </style>
+</head>
+<body class="theme-daughter min-h-screen text-gray-800 font-sans">
+
+    <header class="header-area shadow-sm sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-gray-800"><i class="fas fa-seedling mr-2 text-theme"></i>家庭时光机</h1>
+            
+            <div class="flex items-center space-x-2">
+                <span class="text-sm text-gray-600">当前视角:</span>
+                <select id="viewSelector" class="border border-gray-300 rounded-md py-1 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white">
+                    <option value="daughter">张希悦 (妹妹视角)</option>
+                    <option value="son">张希哲 (哥哥视角)</option>
+                    <option value="parent">爸爸/妈妈视角</option>
+                    <option value="grandparent">爷爷/奶奶视角</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <aside class="col-span-1 space-y-6">
+            <div class="bg-white rounded-xl shadow-sm p-5 border-t-4 border-theme text-center">
+                <img id="avatar" src="https://api.dicebear.com/7.x/adventurer/svg?seed=Mia" alt="Avatar" class="w-24 h-24 rounded-full mx-auto mb-3 bg-gray-100 border-2 border-gray-200">
+                <h2 id="childName" class="text-2xl font-bold text-gray-800">张希悦 (妹妹)</h2>
+                <p id="childBirth" class="text-sm text-gray-500 mt-1">出生于 2026.09.20</p>
+                <div class="mt-4 bg-gray-50 rounded-lg py-2 flex justify-around divide-x divide-gray-200 text-sm">
+                    <div class="px-2">
+                        <span class="block text-gray-500">已来到世界</span>
+                        <span id="daysCount" class="font-bold text-theme text-lg">0</span> 天
+                    </div>
+                    <div class="px-2">
+                        <span class="block text-gray-500">当前状态</span>
+                        <span class="font-bold text-green-600">健康👶</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl shadow-sm p-5 border border-indigo-100 relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-3 opacity-10">
+                    <i class="fas fa-robot text-6xl text-indigo-900"></i>
+                </div>
+                <h3 class="text-lg font-bold text-indigo-900 mb-2"><i class="fas fa-sparkles text-yellow-500 mr-2"></i>AI 智能总结</h3>
+                <p id="aiSummaryText" class="text-sm text-indigo-800 leading-relaxed z-10 relative">
+                    点击下方按钮，AI将为您总结最近的日常与健康状况...
+                </p>
+                <button id="btnAiSummary" class="mt-3 text-xs bg-indigo-100 text-indigo-700 py-1 px-3 rounded-full hover:bg-indigo-200 transition">
+                    生成最新总结 <i class="fas fa-sync-alt ml-1"></i>
+                </button>
+            </div>
+        </aside>
+
+        <section class="col-span-1 md:col-span-2 space-y-4">
+            
+            <!-- Tab 切换 -->
+            <div class="flex border-b border-gray-200 mb-4 overflow-x-auto whitespace-nowrap">
+                <button id="tabJournal" class="py-2 px-4 tab-active" onclick="switchTab('journal')">日常流水账</button>
+                <button id="tabMedical" class="py-2 px-4 tab-inactive" onclick="switchTab('medical')">🏥 检查单智能录入</button>
+                <button id="tabJaundice" class="py-2 px-4 tab-inactive" onclick="switchTab('jaundice')">📈 黄疸曲线追踪</button>
+            </div>
+
+            <!-- 日常流水账发布区 -->
+            <div id="panelJournal" class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 block">
+                <textarea id="entryContent" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-pink-300 resize-none" rows="3" placeholder="记录今天的成长流水账..."></textarea>
+                
+                <div class="mt-2" id="previewContainer" style="display: none;">
+                    <img id="imagePreview" src="" class="h-20 rounded-md object-cover" style="display: none;">
+                    <div id="audioPreview" class="text-sm text-green-600" style="display: none;"><i class="fas fa-music"></i> 语音已选择</div>
+                </div>
+
+                <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                    <div class="flex space-x-4">
+                        <input type="file" id="mediaInput" class="hidden" accept="image/*,audio/*">
+                        <button onclick="document.getElementById('mediaInput').click()" class="text-gray-500 hover:text-blue-500 transition tooltip" title="上传图片/语音">
+                            <i class="fas fa-photo-video text-xl"></i>
+                        </button>
+                    </div>
+                    <button id="btnPublishJournal" class="bg-theme py-1.5 px-5 rounded-full font-medium shadow-md hover:opacity-90 transition disabled:opacity-50 text-white">
+                        发布
+                    </button>
+                </div>
+            </div>
+
+            <!-- 健康检查单发布区 -->
+            <div id="panelMedical" class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 hidden">
+                <div class="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm mb-4">
+                    <i class="fas fa-info-circle mr-1"></i> 上传检查单或输入关键指标（如：血常规），AI将自动为您提炼异常指标并推断复查时间。
+                </div>
+                <input type="text" id="hospitalInput" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="就诊医院 (选填)">
+                <textarea id="medicalContent" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" rows="3" placeholder="手动输入检查结果..."></textarea>
+                
+                <div class="mt-2" id="medicalPreviewContainer" style="display: none;">
+                    <img id="medicalImagePreview" src="" class="h-20 rounded-md object-cover">
+                </div>
+
+                <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                    <div class="flex space-x-4">
+                        <input type="file" id="medicalMediaInput" class="hidden" accept="image/*">
+                        <button onclick="document.getElementById('medicalMediaInput').click()" class="text-gray-500 hover:text-blue-500 transition tooltip" title="拍照/上传检查单">
+                            <i class="fas fa-camera text-xl"></i>
+                        </button>
+                    </div>
+                    <button id="btnPublishMedical" class="bg-blue-500 py-1.5 px-5 rounded-full font-medium shadow-md hover:bg-blue-600 transition disabled:opacity-50 text-white flex items-center">
+                        <i class="fas fa-robot mr-2"></i> AI 智能分析并保存
+                    </button>
+                </div>
+            </div>
+
+            <!-- 黄疸曲线追踪区 -->
+            <div id="panelJaundice" class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 hidden">
+                <div class="bg-yellow-50 text-yellow-800 p-3 rounded-lg text-sm mb-4">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> 新生儿黄疸记录。持续偏高请及时就医。正常值一般应小于 12-15 mg/dL (因日龄而异)。
+                </div>
+                
+                <div class="flex space-x-3 mb-4">
+                    <input type="number" step="0.1" id="jaundiceValue" class="w-1/3 bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="黄疸值 (mg/dL)">
+                    <select id="jaundiceNote" class="w-1/3 bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                        <option value="" disabled selected>选择测量部位</option>
+                        <option value="额头">额头</option>
+                        <option value="面颊">面颊</option>
+                        <option value="胸部">胸部</option>
+                        <option value="腹部">腹部</option>
+                        <option value="手脚">手脚</option>
+                        <option value="静脉血(抽血)">静脉血(抽血)</option>
+                    </select>
+                    <input type="date" id="jaundiceDate" class="w-1/3 bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                </div>
+                
+                <button id="btnPublishJaundice" class="w-full bg-yellow-500 py-2 rounded-lg font-medium shadow hover:bg-yellow-600 transition text-white">
+                    记录黄疸值
+                </button>
+
+                <div class="mt-6 border-t border-gray-100 pt-4">
+                    <canvas id="jaundiceChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- 时间轴列表 (用于流水账和检查单) -->
+            <div id="timeline" class="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent mt-8">
+                <!-- 动态内容将被渲染在这里 -->
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const API_BASE = "";
+        let currentMediaFile = null;
+        let currentMedicalFile = null;
+        let currentPerspective = 'daughter';
+        let currentTab = 'journal'; // 'journal' | 'medical' | 'jaundice'
+        let chartInstance = null;
+        
+        // 设置默认为今天
+        document.getElementById('jaundiceDate').valueAsDate = new Date();
+
+        const calcDays = (birthDateString) => {
+            const birth = new Date(birthDateString);
+            const today = new Date();
+            const diffTime = Math.abs(today - birth);
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        };
+
+        const updateViewInfo = (view) => {
+            currentPerspective = view;
+            const body = document.body;
+            body.className = `theme-${view} min-h-screen text-gray-800 font-sans`;
+            
+            const info = {
+                'daughter': { name: '张希悦 (妹妹)', birth: '2026-09-20', seed: 'Mia' },
+                'son': { name: '张希哲 (哥哥)', birth: '2020-09-26', seed: 'Leo' },
+                'parent': { name: '家庭总览', birth: '2020-09-26', seed: 'Family' },
+                'grandparent': { name: '张希哲 & 张希悦', birth: '2020-09-26', seed: 'Grandpa' }
+            }[view];
+
+            document.getElementById('childName').textContent = info.name;
+            document.getElementById('childBirth').textContent = '出生于 ' + info.birth;
+            document.getElementById('daysCount').textContent = view.includes('parent') ? '∞' : calcDays(info.birth);
+            document.getElementById('avatar').src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${info.seed}`;
+            
+            fetchData();
+        };
+
+        const switchTab = (tab) => {
+            currentTab = tab;
+            ['journal', 'medical', 'jaundice'].forEach(t => {
+                const btn = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                btn.className = t === tab ? 'py-2 px-4 tab-active' : 'py-2 px-4 tab-inactive';
+                document.getElementById(`panel${t.charAt(0).toUpperCase() + t.slice(1)}`).style.display = t === tab ? 'block' : 'none';
+            });
+            
+            document.getElementById('timeline').style.display = tab === 'jaundice' ? 'none' : 'block';
+            fetchData();
+        };
+
+        document.getElementById('viewSelector').addEventListener('change', (e) => updateViewInfo(e.target.value));
+
+        // ... 文件上传事件绑定略 (复用之前的逻辑) ...
+        document.getElementById('mediaInput').addEventListener('change', function(e) { /*...*/ 
+            const file = e.target.files[0];
+            if (!file) return;
+            currentMediaFile = file;
+            const previewContainer = document.getElementById('previewContainer');
+            const imgPreview = document.getElementById('imagePreview');
+            const audioPreview = document.getElementById('audioPreview');
+            previewContainer.style.display = 'block';
+            if (file.type.startsWith('image/')) {
+                imgPreview.src = URL.createObjectURL(file);
+                imgPreview.style.display = 'block';
+                audioPreview.style.display = 'none';
+            } else if (file.type.startsWith('audio/')) {
+                imgPreview.style.display = 'none';
+                audioPreview.style.display = 'block';
+            }
+        });
+        document.getElementById('medicalMediaInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            currentMedicalFile = file;
+            document.getElementById('medicalPreviewContainer').style.display = 'block';
+            document.getElementById('medicalImagePreview').src = URL.createObjectURL(file);
+        });
+
+        // 发布流水账
+        document.getElementById('btnPublishJournal').addEventListener('click', async () => {
+            const content = document.getElementById('entryContent').value;
+            if (!content && !currentMediaFile) return alert("请填写内容或上传图片/语音");
+
+            let mediaUrl = null, mediaType = null;
+            if (currentMediaFile) {
+                const formData = new FormData(); formData.append('file', currentMediaFile);
+                const uploadRes = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
+                const uploadData = await uploadRes.json();
+                mediaUrl = uploadData.media_url; mediaType = uploadData.media_type;
+            }
+            await fetch(`${API_BASE}/api/entries`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ perspective: currentPerspective, author: "我", content: content, media_url: mediaUrl, media_type: mediaType })
+            });
+            document.getElementById('entryContent').value = ''; currentMediaFile = null; document.getElementById('previewContainer').style.display = 'none';
+            fetchData();
+        });
+
+        // 发布检查单
+        document.getElementById('btnPublishMedical').addEventListener('click', async () => {
+            const content = document.getElementById('medicalContent').value;
+            const hospital = document.getElementById('hospitalInput').value;
+            if (!content && !currentMedicalFile) return alert("请填写检查内容或上传检查单照片");
+
+            let mediaUrl = null;
+            if (currentMedicalFile) {
+                const formData = new FormData(); formData.append('file', currentMedicalFile);
+                const uploadRes = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
+                mediaUrl = (await uploadRes.json()).media_url;
+            }
+            await fetch(`${API_BASE}/api/checkups`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ perspective: currentPerspective, hospital: hospital, report_text: content, media_url: mediaUrl })
+            });
+            document.getElementById('medicalContent').value = ''; document.getElementById('hospitalInput').value = '';
+            currentMedicalFile = null; document.getElementById('medicalPreviewContainer').style.display = 'none';
+            fetchData();
+        });
+
+        // 发布黄疸
+        document.getElementById('btnPublishJaundice').addEventListener('click', async () => {
+            const val = document.getElementById('jaundiceValue').value;
+            const note = document.getElementById('jaundiceNote').value;
+            const dateStr = document.getElementById('jaundiceDate').value;
+            if(!val) return alert('请输入黄疸值');
+
+            const dateIso = new Date(dateStr).toISOString();
+
+            await fetch(`${API_BASE}/api/jaundice`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ perspective: currentPerspective, value: parseFloat(val), note: note, record_date: dateIso })
+            });
+            document.getElementById('jaundiceValue').value = '';
+            document.getElementById('jaundiceNote').value = '';
+            fetchData();
+        });
+
+        // 渲染图表
+        function renderChart(data) {
+            const ctx = document.getElementById('jaundiceChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            
+            if (data.length === 0) return;
+
+            // 获取当前宝宝的出生日期
+            let birthStr = '2026-09-20'; // 默认妹妹
+            if (currentPerspective === 'son') birthStr = '2020-09-26';
+            const birthDate = new Date(birthStr);
+
+            // 1. 提取唯一的日期（按天级）
+            const datesMap = {};
+            data.forEach(d => {
+                const dt = new Date(d.record_date);
+                const dateStr = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,'0')}-${dt.getDate().toString().padStart(2,'0')}`;
+                const shortDate = `${dt.getMonth()+1}-${dt.getDate()}`;
+                
+                if (!datesMap[dateStr]) {
+                    datesMap[dateStr] = {
+                        shortDate: shortDate,
+                        dt: dt,
+                        parts: {}
+                    };
+                }
+                datesMap[dateStr].parts[d.note || '未指定'] = d.value;
+            });
+
+            // 按时间排序日期
+            const sortedDateStrs = Object.keys(datesMap).sort();
+            const labels = sortedDateStrs.map(d => datesMap[d].shortDate);
+
+            // 2. 获取所有的测量部位
+            const allParts = new Set();
+            data.forEach(d => allParts.add(d.note || '未指定'));
+            const partsArray = Array.from(allParts);
+
+            // 3. 构建每个部位的数据集
+            const datasets = [];
+            
+            // 为不同部位准备不同颜色
+            const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4'];
+            
+            partsArray.forEach((part, index) => {
+                const partData = sortedDateStrs.map(dateStr => {
+                    return datesMap[dateStr].parts[part] !== undefined ? datesMap[dateStr].parts[part] : null;
+                });
+                
+                datasets.push({
+                    label: part,
+                    data: partData,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    spanGaps: true, // 允许跨过 null 值连线
+                    pointRadius: 4
+                });
+            });
+
+            // 4. 计算平均值曲线
+            const avgData = sortedDateStrs.map(dateStr => {
+                const parts = datesMap[dateStr].parts;
+                const values = Object.values(parts);
+                if (values.length === 0) return null;
+                const sum = values.reduce((a, b) => a + b, 0);
+                return (sum / values.length).toFixed(1);
+            });
+
+            datasets.push({
+                label: '平均值',
+                data: avgData,
+                borderColor: '#ef4444', // 红色突出平均值
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                borderWidth: 3,
+                tension: 0.3,
+                fill: true,
+                spanGaps: true,
+                pointBackgroundColor: '#dc2626',
+                pointRadius: 5,
+                pointHoverRadius: 7
+            });
+
+            // 5. 计算正常值上限曲线
+            const normalValues = sortedDateStrs.map(dateStr => {
+                const dt = datesMap[dateStr].dt;
+                const diffTime = Math.abs(dt - birthDate);
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                
+                let normalLimit = 15;
+                if (diffDays <= 1) normalLimit = 6;
+                else if (diffDays === 2) normalLimit = 9;
+                else if (diffDays === 3) normalLimit = 12;
+                else if (diffDays >= 4 && diffDays <= 7) normalLimit = 15;
+                else if (diffDays > 7 && diffDays <= 14) normalLimit = 12;
+                else normalLimit = 5;
+                
+                return normalLimit;
+            });
+
+            datasets.push({
+                label: '生理性黄疸参考上限',
+                data: normalValues,
+                borderColor: '#10b981', // 绿色
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                tension: 0.3,
+                pointRadius: 0
+            });
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    plugins: { 
+                        legend: { position: 'top' },
+                        tooltip: { mode: 'index', intersect: false },
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'x', // 允许横向拖拽
+                            },
+                            zoom: {
+                                wheel: {
+                                    enabled: true, // 允许鼠标滚轮缩放
+                                },
+                                pinch: {
+                                    enabled: true  // 允许手机双指捏合缩放
+                                },
+                                mode: 'x', // 仅允许横向缩放，保持纵向数值不变形
+                            }
+                        }
+                    },
+                    scales: { 
+                        y: { beginAtZero: true, suggestedMax: 20 } 
+                    }
+                }
+            });
+        }
+
+        // 获取并渲染列表/曲线
+        async function fetchData() {
+            if (currentTab === 'jaundice') {
+                const res = await fetch(`${API_BASE}/api/jaundice${currentPerspective !== 'parent' ? '?perspective='+currentPerspective : ''}`);
+                const data = await res.json();
+                renderChart(data);
+                return;
+            }
+
+            const tl = document.getElementById('timeline');
+            tl.innerHTML = '<div class="text-center text-gray-400 py-10">加载中...</div>';
+            
+            try {
+                let endpoint = currentTab === 'journal' ? '/api/entries' : '/api/checkups';
+                const res = await fetch(`${API_BASE}${endpoint}${currentPerspective !== 'parent' ? '?perspective='+currentPerspective : ''}`);
+                const data = await res.json();
+                
+                if (data.length === 0) {
+                    tl.innerHTML = `<div class="text-center text-gray-400 py-10">暂无${currentTab === 'journal' ? '日记' : '检查单'}记录</div>`;
+                    return;
+                }
+
+                tl.innerHTML = '';
+                data.forEach((item, index) => {
+                    // ...复用渲染时间轴逻辑...
+                    const dateField = currentTab === 'journal' ? item.created_at : item.checkup_date;
+                    const dateObj = new Date(dateField);
+                    const timeStr = `${dateObj.getFullYear()}-${(dateObj.getMonth()+1).toString().padStart(2,'0')}-${dateObj.getDate().toString().padStart(2,'0')} ${dateObj.getHours()}:${dateObj.getMinutes().toString().padStart(2, '0')}`;
+                    
+                    const iconColor = item.perspective === 'daughter' ? 'text-pink-500' : 'text-blue-500';
+                    const iconStr = currentTab === 'journal' ? (item.perspective === 'daughter' ? '<i class="fas fa-baby"></i>' : '<i class="fas fa-child"></i>') : '<i class="fas fa-notes-medical"></i>';
+                    
+                    let contentHtml = '';
+                    if (currentTab === 'journal') {
+                        contentHtml = `<p class="text-gray-700 text-sm whitespace-pre-wrap">${item.content}</p>`;
+                        if (item.media_url) {
+                            if (item.media_type === 'image') contentHtml += `<img src="${item.media_url}" class="mt-3 rounded-lg max-h-48 object-cover">`;
+                            else if (item.media_type === 'audio') contentHtml += `<div class="mt-3 bg-gray-50 border border-gray-200 rounded-full py-2 px-4"><audio controls src="${item.media_url}" class="h-8 w-full"></audio></div>`;
+                        }
+                    } else {
+                        contentHtml = `
+                            ${item.hospital ? `<div class="text-xs text-blue-600 mb-2 font-bold"><i class="far fa-hospital"></i> ${item.hospital}</div>` : ''}
+                            ${item.report_text ? `<p class="text-gray-600 text-sm italic border-l-2 border-gray-200 pl-2 mb-3">"${item.report_text}"</p>` : ''}
+                            ${item.media_url ? `<img src="${item.media_url}" class="mb-3 rounded-lg max-h-32 object-cover border border-gray-200 shadow-sm">` : ''}
+                            <div class="bg-red-50 border border-red-100 rounded-md p-3 mb-2">
+                                <h4 class="text-red-700 font-bold text-xs mb-1"><i class="fas fa-exclamation-triangle"></i> AI 异常指标分析</h4>
+                                <p class="text-red-600 text-sm">${item.abnormal_indicators || '暂无数据'}</p>
+                            </div>
+                            <div class="bg-green-50 border border-green-100 rounded-md p-3 flex justify-between items-center">
+                                <div>
+                                    <h4 class="text-green-700 font-bold text-xs mb-1"><i class="fas fa-calendar-check"></i> 智能建议复查时间</h4>
+                                    <p class="text-green-600 text-xs">${item.next_checkup_notes || '按常规体检时间进行'}</p>
+                                </div>
+                                <div class="text-green-800 font-black text-sm bg-green-200 px-2 py-1 rounded">
+                                    ${item.next_checkup_date ? item.next_checkup_date.split('T')[0] : '待定'}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    const html = `
+                        <div class="relative flex items-center justify-between md:justify-normal ${index % 2 !== 0 ? 'md:flex-row-reverse' : ''} group is-active">
+                            <div class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 ${iconColor}">
+                                ${iconStr}
+                            </div>
+                            <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="font-bold text-gray-800 text-sm">${timeStr}</span>
+                                    <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">${item.perspective === 'daughter'?'妹妹':'哥哥'}</span>
+                                </div>
+                                ${contentHtml}
+                            </div>
+                        </div>
+                    `;
+                    tl.insertAdjacentHTML('beforeend', html);
+                });
+
+            } catch (e) {
+                tl.innerHTML = '<div class="text-center text-red-400 py-10">数据加载失败</div>';
+            }
+        }
+
+        // 初始化
+        updateViewInfo('daughter');
+    </script>
+</body>
+</html>

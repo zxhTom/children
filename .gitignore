@@ -1,0 +1,48 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+
+# SQLite databases, journals, WAL, SHM, and general databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+backend/children_diary.db
+backend/*.db
+backend/*.sqlite*
+
+# Media, file uploads, backups, and user privacy data
+backend/uploads/*
+!backend/uploads/.gitkeep
+uploads/
+media/
+*.bak
+*.backup
+
+# IDE, OS, and system caches
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
