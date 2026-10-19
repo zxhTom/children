@@ -39,6 +39,9 @@ media/
 *.bak
 *.backup
 
+# Host-specific deployment configuration
+deploy/
+
 # IDE, OS, and system caches
 .DS_Store
 Thumbs.db

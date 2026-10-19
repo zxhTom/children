@@ -1,40 +1,88 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text
 from datetime import datetime
+
+from sqlalchemy import Column, Date, DateTime, Float, ForeignKey, Integer, String, Table, Text
+from sqlalchemy.orm import relationship
+
 from .database import Base
+
+
+entry_children = Table(
+    "entry_children",
+    Base.metadata,
+    Column("entry_id", Integer, ForeignKey("journal_entries.id", ondelete="CASCADE"), primary_key=True),
+    Column("child_id", Integer, ForeignKey("children.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class Child(Base):
+    __tablename__ = "children"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(80), nullable=False)
+    nickname = Column(String(80), nullable=True)
+    birth_date = Column(Date, nullable=False)
+    color = Column(String(20), nullable=False, default="#d97757")
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+
 
 class JournalEntry(Base):
     __tablename__ = "journal_entries"
 
     id = Column(Integer, primary_key=True, index=True)
-    perspective = Column(String, index=True) # 视角：daughter, son, parent, grandparent
-    author = Column(String) # 记录人，比如 "妈妈", "爷爷"
+    perspective = Column(String, index=True)  # 保留旧数据字段
+    author = Column(String)
     content = Column(Text)
     created_at = Column(DateTime, default=datetime.now)
-    media_url = Column(String, nullable=True) # 图片或语音的存储路径
-    media_type = Column(String, nullable=True) # 'image', 'audio', 'none'
-    tags = Column(String, nullable=True) # 标签，以逗号分隔，如 "健康,里程碑"
+    media_url = Column(String, nullable=True)
+    media_type = Column(String, nullable=True)
+    tags = Column(String, nullable=True)
+    title = Column(String(120), nullable=True)
+    kind = Column(String(20), default="diary", nullable=False)
+    occurred_at = Column(DateTime, nullable=True)
+    children = relationship("Child", secondary=entry_children, lazy="selectin")
+
+    @property
+    def child_ids(self):
+        return [child.id for child in self.children]
+
 
 class MedicalCheckup(Base):
     __tablename__ = "medical_checkups"
 
     id = Column(Integer, primary_key=True, index=True)
-    perspective = Column(String, index=True)
+    perspective = Column(String, index=True)  # 保留旧数据字段
+    child_id = Column(Integer, ForeignKey("children.id"), index=True, nullable=True)
     checkup_date = Column(DateTime, default=datetime.now)
     hospital = Column(String, nullable=True)
-    report_text = Column(Text, nullable=True) # 检查单OCR内容或手打内容
-    media_url = Column(String, nullable=True) # 检查单照片
-    # AI 提取的结构化结果预留
-    abnormal_indicators = Column(Text, nullable=True) # 异常指标总结
-    next_checkup_date = Column(DateTime, nullable=True) # 复查时间
-    next_checkup_notes = Column(Text, nullable=True) # 复查注意事项
+    report_text = Column(Text, nullable=True)
+    media_url = Column(String, nullable=True)
+    abnormal_indicators = Column(Text, nullable=True)  # 历史数据兼容
+    next_checkup_date = Column(DateTime, nullable=True)
+    next_checkup_notes = Column(Text, nullable=True)
+    weight_kg = Column(Float, nullable=True)
+    height_cm = Column(Float, nullable=True)
+    head_cm = Column(Float, nullable=True)
 
-from sqlalchemy import Float
 
 class JaundiceRecord(Base):
     __tablename__ = "jaundice_records"
 
     id = Column(Integer, primary_key=True, index=True)
-    perspective = Column(String, index=True)
+    perspective = Column(String, index=True)  # 保留旧数据字段
+    child_id = Column(Integer, ForeignKey("children.id"), index=True, nullable=True)
     record_date = Column(DateTime, default=datetime.now)
-    value = Column(Float) # 黄疸值，例如 mg/dL
-    note = Column(String, nullable=True) # 测量部位或备注，例如 "额头"
+    value = Column(Float)
+    note = Column(String, nullable=True)
+
+
+class GrowthRecord(Base):
+    __tablename__ = "growth_records"
+
+    id = Column(Integer, primary_key=True)
+    child_id = Column(Integer, ForeignKey("children.id"), index=True, nullable=False)
+    checkup_id = Column(Integer, ForeignKey("medical_checkups.id"), unique=True, nullable=True)
+    measured_at = Column(DateTime, nullable=False, default=datetime.now)
+    weight_kg = Column(Float, nullable=True)
+    height_cm = Column(Float, nullable=True)
+    head_cm = Column(Float, nullable=True)
+    note = Column(String(300), nullable=True)
