@@ -1,0 +1,12 @@
+[Unit]
+Description=Forward Children from Multipass test to ds2 portmap
+After=portmap.service
+Wants=portmap.service
+
+[Service]
+ExecStart=/usr/bin/ssh -NT -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -R 127.0.0.1:18089:127.0.0.1:18090 ds2
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

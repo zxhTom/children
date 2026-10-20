@@ -19,6 +19,8 @@ env/
 *.key
 *.cert
 *.crt
+deploy/*.env
+!deploy/*.env.example
 
 # SQLite databases, journals, WAL, SHM, and general databases
 *.db
@@ -38,9 +40,6 @@ uploads/
 media/
 *.bak
 *.backup
-
-# Host-specific deployment configuration
-deploy/
 
 # IDE, OS, and system caches
 .DS_Store

@@ -1,0 +1,17 @@
+[Unit]
+Description=Children family diary
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/children/backend
+EnvironmentFile=/etc/children/children.env
+ExecStart=/opt/children/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8088 --proxy-headers --forwarded-allow-ips=10.240.248.1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=Children family diary
+After=network.target
+
+[Service]
+Type=simple
+User={{USER}}
+Group={{GROUP}}
+WorkingDirectory={{APP_ROOT}}/backend
+EnvironmentFile={{APP_ROOT}}/deploy/children.env
+ExecStart={{PYTHON_VENV}}/bin/uvicorn app.main:app --host 0.0.0.0 --port 8088 --proxy-headers --forwarded-allow-ips=127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
