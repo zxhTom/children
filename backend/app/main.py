@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from . import auth
 from .api import router
 from .migrations import initialize_database
+from .schemas import LoginRequest
 
 
 initialize_database()
@@ -27,7 +28,7 @@ login_attempts = defaultdict(list)
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     path = request.url.path
-    public = path in ("/login", "/api/login")
+    public = path in ("/login", "/api/login", "/favicon.svg")
     if not public and not auth.valid_session(request.cookies.get(auth.COOKIE_NAME), AUTH_SECRET):
         if path.startswith("/api/") or path.startswith("/static_uploads/"):
             return JSONResponse({"detail": "请先登录"}, status_code=401)
@@ -42,11 +43,6 @@ async def require_login(request: Request, call_next):
     if path.startswith("/api/") or path in ("/", "/login"):
         response.headers["Cache-Control"] = "no-store"
     return response
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
 
 
 @app.get("/login")
@@ -68,7 +64,8 @@ def login(credentials: LoginRequest, request: Request):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     login_attempts.pop(client, None)
     response = JSONResponse({"ok": True})
-    response.set_cookie(auth.COOKIE_NAME, auth.create_session(AUTH_SECRET), max_age=auth.SESSION_SECONDS,
+    ttl = auth.REMEMBER_SECONDS if credentials.remember_me else auth.SESSION_SECONDS
+    response.set_cookie(auth.COOKIE_NAME, auth.create_session(AUTH_SECRET, ttl_seconds=ttl), max_age=ttl,
                         httponly=True, samesite="lax", secure=request.url.scheme == "https")
     return response
 
@@ -88,6 +85,11 @@ app.include_router(router)
 @app.get("/")
 def read_root():
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/favicon.svg")
+def read_favicon():
+    return FileResponse(STATIC_DIR / "favicon.svg", media_type="image/svg+xml")
 
 
 @app.post("/api/upload")

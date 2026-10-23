@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>登录 · 家庭时光机</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #fdf2f8; color: #334155; font-family: system-ui, -apple-system, "Microsoft YaHei", sans-serif; }
@@ -29,6 +30,10 @@
             <input id="username" name="username" autocomplete="username" required autofocus>
             <label for="password">密码</label>
             <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:14px;color:#475569;">
+                <input id="remember" name="remember" type="checkbox" style="width:auto;cursor:pointer;">
+                <label for="remember" style="margin:0;font-weight:normal;cursor:pointer;">记住登录30天</label>
+            </div>
             <button id="submit" type="submit">登录</button>
             <div id="error" role="alert" aria-live="polite"></div>
         </form>
@@ -46,7 +51,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         username: document.getElementById('username').value,
-                        password: document.getElementById('password').value
+                        password: document.getElementById('password').value,
+                        remember_me: document.getElementById('remember').checked
                     })
                 });
                 if (!response.ok) { error.textContent = response.status === 429 ? '尝试次数过多，请五分钟后再试' : '用户名或密码错误'; return; }

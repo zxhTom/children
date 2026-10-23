@@ -4,6 +4,12 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+    remember_me: bool = False
+
+
 class ChildCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     nickname: str | None = Field(default=None, max_length=80)

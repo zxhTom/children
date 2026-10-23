@@ -6,6 +6,7 @@ import time
 
 COOKIE_NAME = "children_session"
 SESSION_SECONDS = 7 * 24 * 60 * 60
+REMEMBER_SECONDS = 30 * 24 * 60 * 60
 
 
 def configuration():
@@ -31,8 +32,8 @@ def verify_password(password, stored):
         return False
 
 
-def create_session(secret):
-    expires = str(int(time.time()) + SESSION_SECONDS)
+def create_session(secret, ttl_seconds=SESSION_SECONDS):
+    expires = str(int(time.time()) + int(ttl_seconds))
     signature = hmac.new(secret, expires.encode(), hashlib.sha256).hexdigest()
     return f"{expires}.{signature}"
 
@@ -40,7 +41,7 @@ def create_session(secret):
 def valid_session(token, secret):
     try:
         expires, signature = token.split(".", 1)
-        if int(expires) < time.time():
+        if int(expires) <= time.time():
             return False
         expected = hmac.new(secret, expires.encode(), hashlib.sha256).hexdigest()
         return hmac.compare_digest(signature, expected)
