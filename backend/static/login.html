@@ -3,41 +3,469 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#123e35">
+    <meta name="color-scheme" content="light">
     <title>登录 · 家庭时光机</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #fdf2f8; color: #334155; font-family: system-ui, -apple-system, "Microsoft YaHei", sans-serif; }
-        main { width: min(100%, 400px); padding: 36px; border-radius: 20px; background: white; box-shadow: 0 20px 55px #83184318; }
-        .mark { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 16px; background: #fce7f3; color: #be185d; font-size: 29px; }
-        h1 { margin: 22px 0 6px; font-size: 26px; color: #1e293b; }
-        p { margin: 0 0 28px; color: #64748b; }
-        label { display: block; margin: 18px 0 8px; font-size: 14px; font-weight: 600; }
-        input { width: 100%; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; }
-        input:focus { outline: 2px solid #f9a8d4; border-color: #db2777; }
-        button { width: 100%; margin-top: 25px; padding: 13px; border: 0; border-radius: 10px; background: #db2777; color: white; font: inherit; font-weight: 700; cursor: pointer; }
-        button:disabled { opacity: .6; cursor: wait; }
-        #error { min-height: 22px; margin-top: 12px; color: #be123c; font-size: 14px; }
+        :root {
+            --pine: #123e35;
+            --lime: #d6edab;
+            --ink: #203c34;
+            --muted: #82918b;
+            --line: #e7ece7;
+            --paper: #fafbf8;
+            --white: #ffffff;
+            --red: #bd5a55;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--ink);
+            -webkit-font-smoothing: antialiased;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { margin: 0; background: var(--paper); min-height: 100vh; }
+        .login-page {
+            min-height: 100vh;
+            min-height: 100svh;
+            display: grid;
+            grid-template-columns: minmax(0, 1.05fr) minmax(440px, 1fr);
+            background: #fafbf8;
+        }
+        .login-story {
+            min-height: 100vh;
+            min-height: 100svh;
+            background: #123e35;
+            color: #f6f7ee;
+            position: relative;
+            overflow: hidden;
+            padding: 42px 48px;
+            display: flex;
+            flex-direction: column;
+            background-image: radial-gradient(ellipse at 15% 50%, #375b4320, transparent 70%), radial-gradient(ellipse at 100% 80%, #8eb47b18, transparent 65%);
+        }
+        .login-story::after {
+            position: absolute;
+            content: "";
+            inset: 0;
+            background-image: linear-gradient(90deg, #ffffff08 1px, transparent 1px), linear-gradient(#ffffff08 1px, transparent 1px);
+            background-size: 36px 36px;
+            pointer-events: none;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 26px;
+            letter-spacing: -1.2px;
+            font-weight: 750;
+            color: #f6f7ee;
+            text-decoration: none;
+            position: relative;
+            z-index: 1;
+        }
+        .brand-mark {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background: var(--lime);
+            color: #17432f;
+            flex-shrink: 0;
+        }
+        .brand-mark svg {
+            width: 22px;
+            height: 22px;
+            display: block;
+        }
+        .brand-tag {
+            font-size: 9px;
+            letter-spacing: 2px;
+            font-weight: 450;
+            margin-left: 6px;
+            color: #9db9a9;
+            border: 1px solid #446657;
+            border-radius: 4px;
+            padding: 4px 7px;
+        }
+        .story-copy {
+            margin-top: 76px;
+            position: relative;
+            z-index: 1;
+        }
+        .eyebrow {
+            font-size: 10px;
+            letter-spacing: 1.8px;
+            font-weight: 650;
+            color: #bcceb5;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .live-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #ccedac;
+        }
+        .story-copy h1 {
+            font-size: clamp(34px, 3.1vw, 50px);
+            font-weight: 550;
+            line-height: 1.45;
+            letter-spacing: -1.5px;
+            margin: 23px 0 20px;
+        }
+        .story-copy h1 span {
+            color: #d6edab;
+        }
+        .story-copy p {
+            color: #a9bdb0;
+            line-height: 1.9;
+            font-size: 14px;
+            letter-spacing: .3px;
+        }
+        .network-art {
+            position: relative;
+            margin: 30px 0;
+            flex: 1;
+            max-height: 360px;
+            min-height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .art-box {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 320px;
+            border: 1px solid #6c90765c;
+            border-radius: 16px;
+            background: #254b3ee6;
+            box-shadow: 0 16px 40px #082b2633;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .art-box-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #c9dfa9;
+            letter-spacing: 1px;
+        }
+        .art-box-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ecf4df;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .art-box-sub {
+            font-size: 12px;
+            color: #9cbca4;
+            line-height: 1.6;
+        }
+        .story-bottom {
+            display: flex;
+            justify-content: space-between;
+            font-size: 8px;
+            letter-spacing: 1.5px;
+            color: #81a18f;
+            margin-top: auto;
+            z-index: 1;
+        }
+        .login-panel {
+            padding: 38px 45px 28px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            min-height: 100svh;
+            position: relative;
+            background: #fafbf8;
+        }
+        .login-corner {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            align-self: flex-end;
+            font-size: 11px;
+            color: #829286;
+        }
+        .login-form-wrap {
+            width: 100%;
+            max-width: 380px;
+            margin: auto;
+            padding: 40px 0;
+        }
+        .login-form-wrap .eyebrow {
+            color: #79927b;
+            margin-bottom: 12px;
+        }
+        .login-form-wrap h2 {
+            font-size: 34px;
+            font-weight: 570;
+            letter-spacing: -1px;
+            margin: 0 0 10px;
+        }
+        .login-sub {
+            font-size: 13px;
+            color: #88958d;
+            line-height: 1.8;
+            margin-bottom: 28px;
+        }
+        .login-form-wrap label {
+            display: block;
+            font-size: 13px;
+            font-weight: 550;
+            margin: 18px 0 8px;
+            color: #203c34;
+        }
+        .input-icon {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .input-icon svg {
+            position: absolute;
+            left: 14px;
+            width: 18px;
+            height: 18px;
+            color: #94a193;
+            pointer-events: none;
+        }
+        .input-icon input {
+            width: 100%;
+            height: 48px;
+            padding: 0 16px 0 44px;
+            background: #ffffff;
+            border: 1px solid #dde4dc;
+            border-radius: 9px;
+            font-size: 14px;
+            color: var(--ink);
+            outline: none;
+            transition: border-color .18s, box-shadow .18s;
+        }
+        .input-icon input:focus {
+            border-color: #538b64;
+            box-shadow: 0 0 0 3px #659c6d18;
+        }
+        .remember-row {
+            display: flex;
+            align-items: center;
+            margin-top: 14px;
+        }
+        .remember-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #446156;
+            cursor: pointer;
+            user-select: none;
+            margin: 0;
+        }
+        .remember-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #205842;
+            cursor: pointer;
+            margin: 0;
+        }
+        .login-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 16px 0 20px;
+            font-size: 11px;
+            color: #8d9b90;
+        }
+        .login-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .login-meta svg {
+            width: 13px;
+            height: 13px;
+        }
+        #error {
+            min-height: 20px;
+            font-size: 13px;
+            color: #bd5a55;
+            background: #fff4f2;
+            border: 1px solid #f2d4ce;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+        }
+        #error:empty {
+            display: none;
+        }
+        .login-submit {
+            width: 100%;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            background: #205842;
+            border: 1px solid #205842;
+            border-radius: 9px;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 550;
+            cursor: pointer;
+            box-shadow: 0 3px 8px #173c3410;
+            transition: background .18s, transform .18s;
+        }
+        .login-submit:hover {
+            background: #164631;
+        }
+        .login-submit:disabled {
+            opacity: .6;
+            cursor: wait;
+        }
+        .login-note {
+            display: flex;
+            gap: 12px;
+            border-top: 1px solid #e6eadf;
+            margin-top: 32px;
+            padding-top: 22px;
+            color: #8c998e;
+            font-size: 12px;
+            line-height: 1.8;
+        }
+        .login-note svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            margin-top: 2px;
+            color: #799a80;
+        }
+        .login-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #9aa89b;
+            margin-top: auto;
+            padding-top: 20px;
+        }
+        @media (max-width: 720px) {
+            .login-page { display: block; }
+            .login-story { display: none; }
+            .login-panel {
+                min-height: 100vh;
+                min-height: 100svh;
+                padding: 28px 24px 20px;
+                background: radial-gradient(ellipse at 20% 0%, #e6edd8b0, transparent 60%), #fafbf8;
+            }
+            .login-corner { align-self: flex-start; margin-bottom: 20px; }
+            .login-form-wrap { max-width: 360px; padding: 20px 0; }
+            .login-form-wrap::before {
+                content: "家庭时光机.";
+                display: block;
+                color: #24543d;
+                font-size: 28px;
+                font-weight: 750;
+                letter-spacing: -1.2px;
+                margin-bottom: 28px;
+            }
+            .login-form-wrap h2 { font-size: 30px; }
+        }
     </style>
 </head>
 <body>
-    <main>
-        <div class="mark" aria-hidden="true">🌱</div>
-        <h1>家庭时光机</h1>
-        <p>登录后查看成长日记与健康记录</p>
-        <form id="loginForm">
-            <label for="username">用户名</label>
-            <input id="username" name="username" autocomplete="username" required autofocus>
-            <label for="password">密码</label>
-            <input id="password" name="password" type="password" autocomplete="current-password" required>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:14px;color:#475569;">
-                <input id="remember" name="remember" type="checkbox" style="width:auto;cursor:pointer;">
-                <label for="remember" style="margin:0;font-weight:normal;cursor:pointer;">记住登录30天</label>
+    <div class="login-page">
+        <aside class="login-story">
+            <a class="brand" href="/">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 32 32" fill="none">
+                        <path d="M16 6 C16 6 13 3.5 9 4.5 C5 5.5 4 9.5 5 13.5 C7 19.5 16 25.5 16 25.5 C16 25.5 25 19.5 27 13.5 C28 9.5 27 5.5 23 4.5 C19 3.5 16 6 16 6 Z" fill="#123e35"/>
+                        <path d="M16 10 C16.5 12 18 13.5 20 14 C18 14.5 16.5 16 16 18 C15.5 16 14 14.5 12 14 C14 13.5 15.5 12 16 10 Z" fill="#b9df91"/>
+                    </svg>
+                </span>
+                <span>家庭时光机</span>
+                <span class="brand-tag">TIMELINE</span>
+            </a>
+            <div class="story-copy">
+                <span class="eyebrow"><span class="live-dot"></span> PRECIOUS MEMORIES</span>
+                <h1>把每一刻成长，<br>都好好<span>珍藏。</span></h1>
+                <p>记录宝贝与家庭的点滴足迹。<br>成长日记、健康档案与生活记录，温情陪伴。</p>
             </div>
-            <button id="submit" type="submit">登录</button>
-            <div id="error" role="alert" aria-live="polite"></div>
-        </form>
-    </main>
+            <div class="network-art" aria-hidden="true">
+                <div class="art-box">
+                    <div class="art-box-head"><span>GROWTH ARCHIVE</span><span>FAMILY DIARY ↗</span></div>
+                    <div class="art-box-title">
+                        <span class="brand-mark" style="width:30px;height:30px;">
+                            <svg viewBox="0 0 32 32" fill="none" style="width:18px;height:18px;">
+                                <path d="M16 6 C16 6 13 3.5 9 4.5 C5 5.5 4 9.5 5 13.5 C7 19.5 16 25.5 16 25.5 C16 25.5 25 19.5 27 13.5 C28 9.5 27 5.5 23 4.5 C19 3.5 16 6 16 6 Z" fill="#123e35"/>
+                                <path d="M16 10 C16.5 12 18 13.5 20 14 C18 14.5 16.5 16 16 18 C15.5 16 14 14.5 12 14 C14 13.5 15.5 12 16 10 Z" fill="#b9df91"/>
+                            </svg>
+                        </span>
+                        温情记忆馆
+                    </div>
+                    <div class="art-box-sub">成长日记 · 身高体重 · 疫苗动态</div>
+                </div>
+            </div>
+            <div class="story-bottom">
+                <span>BUILT FOR FAMILY ARCHIVE</span>
+                <span>GROWTH & HEALTH</span>
+            </div>
+        </aside>
+
+        <main class="login-panel">
+            <span class="login-corner">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg>
+                家庭时光机 · 身份验证
+            </span>
+            <div class="login-form-wrap">
+                <span class="eyebrow">WELCOME BACK</span>
+                <h2>欢迎回来</h2>
+                <p class="login-sub">登录家庭时光机，查阅宝贝的成长日记。</p>
+                <form id="loginForm">
+                    <label for="username">用户名</label>
+                    <div class="input-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg>
+                        <input id="username" name="username" autocomplete="username" required autofocus placeholder="请输入用户名">
+                    </div>
+                    <label for="password">密码</label>
+                    <div class="input-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></svg>
+                        <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="请输入访问密码">
+                    </div>
+                    <div class="remember-row">
+                        <label class="remember-label" for="remember">
+                            <input id="remember" name="remember" type="checkbox">
+                            <span>记住登录30天</span>
+                        </label>
+                    </div>
+                    <div class="login-meta">
+                        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> 默认会话 7 天</span>
+                        <span>成长档案</span>
+                    </div>
+                    <div id="error" role="alert" aria-live="polite"></div>
+                    <button id="submit" class="login-submit" type="submit">
+                        <span>进入时光机</span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16m-6-6 6 6-6 6"/></svg>
+                    </button>
+                </form>
+                <div class="login-note">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg>
+                    <p>家庭珍贵记忆仅对家庭成员开放。<br><span>陪伴成长的每一步，都在这里记录。</span></p>
+                </div>
+            </div>
+            <footer class="login-footer">
+                <span>© 家庭时光机</span>
+                <span>把成长好好珍藏 ↗</span>
+            </footer>
+        </main>
+    </div>
+
     <script>
         document.getElementById('loginForm').addEventListener('submit', async (event) => {
             event.preventDefault();
