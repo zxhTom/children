@@ -107,6 +107,10 @@ def update_entry(entry_id: int, payload: schemas.EntryUpdate, db: Session = Depe
         if key in ("kind", "author", "content") and value is None:
             raise HTTPException(status_code=422, detail=f"{key} 不能为空")
         setattr(entry, key, value)
+    if any(key in updates for key in ("title", "content", "media_url")) and not any(
+        (entry.title and entry.title.strip(), entry.content and entry.content.strip(), entry.media_url)
+    ):
+        raise HTTPException(status_code=422, detail="请保留标题、内容或素材")
     db.commit()
     db.refresh(entry)
     return entry
@@ -143,15 +147,33 @@ def create_checkup(payload: schemas.CheckupCreate, db: Session = Depends(get_db)
 
 
 @router.patch("/checkups/{checkup_id}", response_model=schemas.CheckupOut)
-def assign_checkup(checkup_id: int, payload: schemas.CheckupUpdate, db: Session = Depends(get_db)):
+def update_checkup(checkup_id: int, payload: schemas.CheckupUpdate, db: Session = Depends(get_db)):
     checkup = db.get(models.MedicalCheckup, checkup_id)
     if checkup is None:
         raise HTTPException(status_code=404, detail="体检记录不存在")
-    require_child(db, payload.child_id)
-    checkup.child_id = payload.child_id
+    updates = payload.model_dump(exclude_unset=True)
+    if "child_id" in updates:
+        if updates["child_id"] is None:
+            raise HTTPException(status_code=422, detail="宝宝不能为空")
+        require_child(db, updates["child_id"])
+    if "checkup_date" in updates and updates["checkup_date"] is None:
+        raise HTTPException(status_code=422, detail="体检日期不能为空")
+    for key, value in updates.items():
+        setattr(checkup, key, value)
     growth = db.query(models.GrowthRecord).filter_by(checkup_id=checkup.id).first()
-    if growth:
-        growth.child_id = payload.child_id
+    has_measurement = any(getattr(checkup, key) is not None for key in ("weight_kg", "height_cm", "head_cm"))
+    if growth and (not has_measurement or checkup.child_id is None):
+        db.delete(growth)
+    elif has_measurement and checkup.child_id is not None:
+        if growth is None:
+            growth = models.GrowthRecord(checkup_id=checkup.id)
+            db.add(growth)
+        growth.child_id = checkup.child_id
+        growth.measured_at = checkup.checkup_date
+        growth.weight_kg = checkup.weight_kg
+        growth.height_cm = checkup.height_cm
+        growth.head_cm = checkup.head_cm
+        growth.note = checkup.hospital
     db.commit()
     db.refresh(checkup)
     return checkup
@@ -181,12 +203,20 @@ def create_jaundice(payload: schemas.JaundiceCreate, db: Session = Depends(get_d
 
 
 @router.patch("/jaundice/{record_id}", response_model=schemas.JaundiceOut)
-def assign_jaundice(record_id: int, payload: schemas.JaundiceUpdate, db: Session = Depends(get_db)):
+def update_jaundice(record_id: int, payload: schemas.JaundiceUpdate, db: Session = Depends(get_db)):
     record = db.get(models.JaundiceRecord, record_id)
     if record is None:
         raise HTTPException(status_code=404, detail="黄疸记录不存在")
-    require_child(db, payload.child_id)
-    record.child_id = payload.child_id
+    updates = payload.model_dump(exclude_unset=True)
+    if "child_id" in updates:
+        if updates["child_id"] is None:
+            raise HTTPException(status_code=422, detail="宝宝不能为空")
+        require_child(db, updates["child_id"])
+    for key in ("record_date", "value"):
+        if key in updates and updates[key] is None:
+            raise HTTPException(status_code=422, detail=f"{key} 不能为空")
+    for key, value in updates.items():
+        setattr(record, key, value)
     db.commit()
     db.refresh(record)
     return record
@@ -209,6 +239,28 @@ def create_growth(payload: schemas.GrowthCreate, db: Session = Depends(get_db)):
     data["measured_at"] = data["measured_at"] or datetime.now()
     record = models.GrowthRecord(**data)
     db.add(record)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+@router.patch("/growth/{record_id}", response_model=schemas.GrowthOut)
+def update_growth(record_id: int, payload: schemas.GrowthUpdate, db: Session = Depends(get_db)):
+    record = db.get(models.GrowthRecord, record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="测量记录不存在")
+    if record.checkup_id is not None:
+        raise HTTPException(status_code=409, detail="这条测量来自体检，请编辑对应的体检记录")
+    updates = payload.model_dump(exclude_unset=True)
+    if "child_id" in updates:
+        if updates["child_id"] is None:
+            raise HTTPException(status_code=422, detail="宝宝不能为空")
+        require_child(db, updates["child_id"])
+    if "measured_at" in updates and updates["measured_at"] is None:
+        raise HTTPException(status_code=422, detail="测量日期不能为空")
+    for key, value in updates.items():
+        setattr(record, key, value)
+    require_measurement(record.weight_kg, record.height_cm, record.head_cm)
     db.commit()
     db.refresh(record)
     return record

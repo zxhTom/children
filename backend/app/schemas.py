@@ -49,6 +49,8 @@ class EntryUpdate(BaseModel):
     author: str | None = Field(default=None, max_length=80)
     content: str | None = Field(default=None, max_length=10000)
     occurred_at: datetime | None = None
+    media_url: str | None = None
+    media_type: Literal["image", "audio"] | None = None
 
 
 class EntryOut(BaseModel):
@@ -80,7 +82,16 @@ class CheckupCreate(BaseModel):
 
 
 class CheckupUpdate(BaseModel):
-    child_id: int
+    child_id: int | None = None
+    checkup_date: datetime | None = None
+    hospital: str | None = Field(default=None, max_length=160)
+    report_text: str | None = Field(default=None, max_length=10000)
+    media_url: str | None = None
+    next_checkup_date: datetime | None = None
+    next_checkup_notes: str | None = Field(default=None, max_length=1000)
+    weight_kg: float | None = Field(default=None, gt=0, le=150)
+    height_cm: float | None = Field(default=None, gt=0, le=250)
+    head_cm: float | None = Field(default=None, gt=0, le=100)
 
 
 class CheckupOut(BaseModel):
@@ -107,7 +118,10 @@ class JaundiceCreate(BaseModel):
 
 
 class JaundiceUpdate(BaseModel):
-    child_id: int
+    child_id: int | None = None
+    record_date: datetime | None = None
+    value: float | None = Field(default=None, ge=0, le=50)
+    note: str | None = Field(default=None, max_length=160)
 
 
 class JaundiceOut(BaseModel):
@@ -121,6 +135,15 @@ class JaundiceOut(BaseModel):
 
 class GrowthCreate(BaseModel):
     child_id: int
+    measured_at: datetime | None = None
+    weight_kg: float | None = Field(default=None, gt=0, le=150)
+    height_cm: float | None = Field(default=None, gt=0, le=250)
+    head_cm: float | None = Field(default=None, gt=0, le=100)
+    note: str | None = Field(default=None, max_length=300)
+
+
+class GrowthUpdate(BaseModel):
+    child_id: int | None = None
     measured_at: datetime | None = None
     weight_kg: float | None = Field(default=None, gt=0, le=150)
     height_cm: float | None = Field(default=None, gt=0, le=250)

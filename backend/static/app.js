@@ -61,7 +61,9 @@ function optionList() { return state.children.map((child) => `<option value="${c
 function selectOptions(id) {
     const previous = $(id).value;
     $(id).innerHTML = optionList();
-    if (state.childId !== null) $(id).value = String(state.childId);
+    const editField = { checkupChild: 'checkupEditId', jaundiceChild: 'jaundiceEditId', growthChild: 'growthEditId' }[id];
+    if (editField && $(editField).value && previous && childById(previous)) $(id).value = previous;
+    else if (state.childId !== null) $(id).value = String(state.childId);
     else if (previous && childById(previous)) $(id).value = previous;
 }
 function childChecks(id, checkedIds) {
@@ -95,6 +97,7 @@ function empty(icon, message) { return `<div class="empty"><span class="empty-ic
 function chips(ids) {
     return ids.length ? ids.map((id) => `<span class="chip">${esc(childName(id))}</span>`).join('') : '<span class="chip">待归档</span>';
 }
+function editButton(type, id) { return `<button class="minor-button edit-record" type="button" data-edit-record="${type}" data-record-id="${id}">编辑记录 ↗</button>`; }
 function renderOverview() {
     const unassigned = state.entries.filter((entry) => !entry.child_ids.length).length + state.checkups.filter((item) => item.child_id === null).length + state.jaundice.filter((item) => item.child_id === null).length;
     $('unassignedBanner').hidden = !unassigned;
@@ -144,10 +147,10 @@ function chapterEvents(child) {
 }
 function handbookEventHtml(event) {
     const item = event.item;
-    if (event.type === 'entry') return `<article class="chapter-event"><span class="chapter-event-kind">${item.kind === 'milestone' ? '✦ 关键时刻' : '✎ 成长日记'} · ${prettyDate(event.date)}</span><h3>${esc(item.title || (item.kind === 'milestone' ? '值得纪念的一天' : '这一天的故事'))}</h3>${item.content ? `<p>${esc(item.content)}</p>` : ''}${mediaHtml(item)}${item.child_ids.length > 1 ? '<small>家人共同的记忆</small>' : ''}</article>`;
-    if (event.type === 'checkup') return `<article class="chapter-event"><span class="chapter-event-kind">♡ 体检记录 · ${prettyDate(event.date)}</span><h3>${esc(item.hospital || '一次健康随访')}</h3>${item.report_text ? `<p>${esc(item.report_text)}</p>` : ''}${safeMedia(item.media_url) ? `<img class="timeline-media" src="${safeMedia(item.media_url)}" alt="体检单照片" loading="lazy">` : ''}<div class="record-metrics">${metricPills(item)}</div>${item.next_checkup_date ? `<small>医生建议复查：${prettyDate(item.next_checkup_date)}</small>` : ''}</article>`;
-    if (event.type === 'jaundice') return `<article class="chapter-event"><span class="chapter-event-kind">♡ 黄疸观察 · ${prettyDate(event.date)}</span><h3>记录数值 ${esc(item.value)}</h3>${item.note ? `<p>${esc(item.note)}</p>` : ''}</article>`;
-    return `<article class="chapter-event"><span class="chapter-event-kind">↗ 生长测量 · ${prettyDate(event.date)}</span><h3>一次成长刻度</h3><div class="record-metrics">${metricPills(item)}</div>${item.note ? `<p>${esc(item.note)}</p>` : ''}</article>`;
+    if (event.type === 'entry') return `<article class="chapter-event"><span class="chapter-event-kind">${item.kind === 'milestone' ? '✦ 关键时刻' : '✎ 成长日记'} · ${prettyDate(event.date)}</span><h3>${esc(item.title || (item.kind === 'milestone' ? '值得纪念的一天' : '这一天的故事'))}</h3>${item.content ? `<p>${esc(item.content)}</p>` : ''}${mediaHtml(item)}${item.child_ids.length > 1 ? '<small>家人共同的记忆</small>' : ''}${editButton('entry', item.id)}</article>`;
+    if (event.type === 'checkup') return `<article class="chapter-event"><span class="chapter-event-kind">♡ 体检记录 · ${prettyDate(event.date)}</span><h3>${esc(item.hospital || '一次健康随访')}</h3>${item.report_text ? `<p>${esc(item.report_text)}</p>` : ''}${safeMedia(item.media_url) ? `<img class="timeline-media" src="${safeMedia(item.media_url)}" alt="体检单照片" loading="lazy">` : ''}<div class="record-metrics">${metricPills(item)}</div>${item.next_checkup_date ? `<small>医生建议复查：${prettyDate(item.next_checkup_date)}</small>` : ''}${editButton('checkup', item.id)}</article>`;
+    if (event.type === 'jaundice') return `<article class="chapter-event"><span class="chapter-event-kind">♡ 黄疸观察 · ${prettyDate(event.date)}</span><h3>记录数值 ${esc(item.value)}</h3>${item.note ? `<p>${esc(item.note)}</p>` : ''}${editButton('jaundice', item.id)}</article>`;
+    return `<article class="chapter-event"><span class="chapter-event-kind">↗ 生长测量 · ${prettyDate(event.date)}</span><h3>一次成长刻度</h3><div class="record-metrics">${metricPills(item)}</div>${item.note ? `<p>${esc(item.note)}</p>` : ''}${editButton('growth', item.id)}</article>`;
 }
 function renderHandbook() {
     const root = $('handbookContent');
@@ -170,12 +173,12 @@ function renderHandbook() {
     root.innerHTML = `<div class="handbook-layout"><aside class="surface handbook-index"><span class="kicker">CHAPTER INDEX</span><h3>${esc(child.nickname || child.name)}的章节</h3><p class="muted">显示有记录的月份和当前月龄。</p><div class="chapter-index-list">${months.map((value) => `<button class="chapter-index-item ${value === month ? 'active' : ''}" type="button" data-chapter-month="${value}" aria-current="${value === month ? 'page' : 'false'}"><span>${esc(chapterLabel(value))}</span><small>${chapterSizes.has(value) ? `${chapterSizes.get(value)} 条` : '待记录'}</small></button>`).join('')}</div></aside><div class="handbook-page"><div class="chapter-cover"><span class="kicker">${esc(child.nickname || child.name)} · GROWING DAYS</span><h2>${esc(chapterLabel(month))}</h2><p>${month < 0 ? `出生于 ${prettyDate(child.birth_date)} 之前` : `${prettyDate(start)} — ${prettyDate(end)} 前`}</p><div class="chapter-counts"><span>${counts.entry} 段回忆</span><span>${counts.checkup} 次体检</span><span>${counts.growth} 次家庭测量</span>${counts.jaundice ? `<span>${counts.jaundice} 条黄疸观察</span>` : ''}</div></div><div class="chapter-actions"><button class="button soft" type="button" data-chapter-write>写一段回忆</button><button class="button ghost" type="button" data-chapter-story>用本章生成故事 ↗</button></div><div class="chapter-event-list">${chapter.length ? chapter.map(handbookEventHtml).join('') : empty('✎', '这一章还没有记录。写下一个真实的瞬间，手册就会多一页。')}</div></div></div>`;
 }
 function renderTimeline(preserveSelection = false) {
-    const chosen = preserveSelection ? checkedChildren('entryChildren') : state.childId === null ? [] : [state.childId];
+    const chosen = preserveSelection || $('entryEditId').value ? checkedChildren('entryChildren') : state.childId === null ? [] : [state.childId];
     childChecks('entryChildren', chosen);
     renderPrompts();
     const filter = $('entryKindFilter').value;
     const entries = state.entries.filter(queryChild).filter((entry) => filter === 'all' || entry.kind === filter);
-    $('timelineList').innerHTML = entries.length ? entries.map((entry) => `<article class="timeline-item ${entry.kind === 'milestone' ? 'milestone' : ''}"><div class="timeline-card ${entry.kind === 'milestone' ? 'milestone' : ''}"><div class="timeline-head"><div><span class="kicker">${entry.kind === 'milestone' ? '✦ KEY MOMENT' : 'DAILY NOTE'} · ${prettyDate(entry.occurred_at || entry.created_at)}</span><h3>${esc(entry.title || (entry.kind === 'milestone' ? '关键时刻' : '成长日记'))}</h3></div><span class="small-meta">${esc(entry.author || '家人')} 记录</span></div><p>${esc(entry.content || '')}</p>${mediaHtml(entry)}<div class="tagline">${chips(entry.child_ids)}${entry.child_ids.length > 1 ? '<span class="chip shared">共同的记忆</span>' : ''}<button class="minor-button" type="button" data-assign-entry="${entry.id}">关联宝宝 ↗</button></div></div></article>`).join('') : empty('✎', '这里还没有记录。写下今天，故事就开始了。');
+    $('timelineList').innerHTML = entries.length ? entries.map((entry) => `<article class="timeline-item ${entry.kind === 'milestone' ? 'milestone' : ''}"><div class="timeline-card ${entry.kind === 'milestone' ? 'milestone' : ''}"><div class="timeline-head"><div><span class="kicker">${entry.kind === 'milestone' ? '✦ KEY MOMENT' : 'DAILY NOTE'} · ${prettyDate(entry.occurred_at || entry.created_at)}</span><h3>${esc(entry.title || (entry.kind === 'milestone' ? '关键时刻' : '成长日记'))}</h3></div><span class="small-meta">${esc(entry.author || '家人')} 记录</span></div><p>${esc(entry.content || '')}</p>${mediaHtml(entry)}<div class="tagline">${chips(entry.child_ids)}${entry.child_ids.length > 1 ? '<span class="chip shared">共同的记忆</span>' : ''}<button class="minor-button" type="button" data-assign-entry="${entry.id}">关联宝宝 ↗</button>${editButton('entry', entry.id)}</div></div></article>`).join('') : empty('✎', '这里还没有记录。写下今天，故事就开始了。');
 }
 function renderPrompts() {
     const child = childById(checkedChildren('entryChildren')[0]);
@@ -196,11 +199,11 @@ function metricPills(item) {
 function renderHealth() {
     ['checkupChild', 'jaundiceChild'].forEach(selectOptions);
     const checkups = state.checkups.filter(queryChild);
-    $('checkupList').innerHTML = checkups.length ? checkups.map((item) => `<article class="record"><div class="record-head"><div><span class="kicker">${prettyDate(item.checkup_date)}</span><h3>${esc(item.hospital || '体检记录')}</h3></div><div class="tagline">${assignHealthHtml('checkups', item)}</div></div>${item.report_text ? `<p>${esc(item.report_text)}</p>` : ''}${item.abnormal_indicators ? `<p class="followup">旧版自动分析记录：${esc(item.abnormal_indicators)}</p>` : ''}${safeMedia(item.media_url) ? `<img class="timeline-media" src="${safeMedia(item.media_url)}" alt="体检单照片" loading="lazy">` : ''}<div class="record-metrics">${metricPills(item)}</div>${item.next_checkup_date ? `<p class="followup">医生建议复查：${prettyDate(item.next_checkup_date)} ${esc(item.next_checkup_notes || '')}</p>` : ''}</article>`).join('') : empty('♡', '还没有体检记录。');
+    $('checkupList').innerHTML = checkups.length ? checkups.map((item) => `<article class="record"><div class="record-head"><div><span class="kicker">${prettyDate(item.checkup_date)}</span><h3>${esc(item.hospital || '体检记录')}</h3></div><div class="tagline">${assignHealthHtml('checkups', item)}</div></div>${item.report_text ? `<p>${esc(item.report_text)}</p>` : ''}${item.abnormal_indicators ? `<p class="followup">旧版自动分析记录：${esc(item.abnormal_indicators)}</p>` : ''}${safeMedia(item.media_url) ? `<img class="timeline-media" src="${safeMedia(item.media_url)}" alt="体检单照片" loading="lazy">` : ''}<div class="record-metrics">${metricPills(item)}</div>${item.next_checkup_date ? `<p class="followup">医生建议复查：${prettyDate(item.next_checkup_date)} ${esc(item.next_checkup_notes || '')}</p>` : ''}${editButton('checkup', item.id)}</article>`).join('') : empty('♡', '还没有体检记录。');
     const child = selectedChild();
     $('visitPlan').innerHTML = child ? (state.visits[child.id] || []).map((visit) => `<div class="plan-item ${visit.status}"><span class="plan-marker"></span><span><strong>${esc(visit.label)}</strong><small>${prettyDate(visit.due_date)}</small></span><em>${visit.status === 'recorded' ? '已记录' : visit.status === 'pending' ? '待核对' : '将到来'}</em></div>`).join('') : '<p class="muted">选择一个宝宝，查看按出生日期排列的随访节点。</p>';
     const jaundice = state.jaundice.filter(queryChild);
-    $('jaundiceList').innerHTML = jaundice.slice(-6).reverse().map((item) => `<div class="compact-record"><span>${prettyDate(item.record_date)} · ${esc(childName(item.child_id))} ${esc(item.note || '')}</span><strong>${esc(item.value)}</strong>${item.child_id === null ? assignHealthHtml('jaundice', item) : ''}</div>`).join('');
+    $('jaundiceList').innerHTML = jaundice.slice(-6).reverse().map((item) => `<div class="compact-record"><span>${prettyDate(item.record_date)} · ${esc(childName(item.child_id))} ${esc(item.note || '')}</span><strong>${esc(item.value)}</strong>${item.child_id === null ? assignHealthHtml('jaundice', item) : ''}${editButton('jaundice', item.id)}</div>`).join('');
     $('jaundiceChart').innerHTML = child ? lineChart(jaundice, 'record_date', 'value', '#d0a054', '') : '<div class="chart-empty">选择宝宝后查看黄疸记录趋势</div>';
 }
 function lineChart(items, dateKey, valueKey, color, unit) {
@@ -222,7 +225,7 @@ function lineChart(items, dateKey, valueKey, color, unit) {
 function renderGrowth() {
     selectOptions('growthChild');
     const rows = state.growth.filter(queryChild);
-    $('growthList').innerHTML = rows.length ? [...rows].reverse().map((item) => `<article class="record"><div class="record-head"><div><span class="kicker">${prettyDate(item.measured_at)}</span><h3>${esc(childName(item.child_id))}的生长记录</h3></div><span class="chip">${item.checkup_id ? '来自体检' : '家人测量'}</span></div><div class="record-metrics">${metricPills(item)}</div>${item.note ? `<p>${esc(item.note)}</p>` : ''}</article>`).join('') : empty('↗', '还没有测量记录。');
+    $('growthList').innerHTML = rows.length ? [...rows].reverse().map((item) => `<article class="record"><div class="record-head"><div><span class="kicker">${prettyDate(item.measured_at)}</span><h3>${esc(childName(item.child_id))}的生长记录</h3></div><span class="chip">${item.checkup_id ? '来自体检' : '家人测量'}</span></div><div class="record-metrics">${metricPills(item)}</div>${item.note ? `<p>${esc(item.note)}</p>` : ''}${editButton(item.checkup_id ? 'checkup' : 'growth', item.checkup_id || item.id)}</article>`).join('') : empty('↗', '还没有测量记录。');
     $('growthChart').innerHTML = selectedChild() ? lineChart(rows, 'measured_at', $('growthMetric').value, '#c9785d', $('growthMetric').selectedOptions[0].textContent.split('·').at(-1).trim()) : '<div class="chart-empty">请在页面上方选择一个宝宝，查看专属生长曲线</div>';
 }
 function renderStoryForm() { childChecks('storyChildren', state.story ? state.story.children.map((child) => child.id) : state.childId === null ? state.children.map((child) => child.id) : [state.childId]); }
@@ -274,6 +277,73 @@ async function submitForm(event, work) {
     try { await work(); } catch (error) { toast(error.message || '操作失败', true); } finally { if (button) button.disabled = false; }
 }
 function resetFile(inputId, labelId) { $(inputId).value = ''; $(labelId).textContent = ''; }
+const editForms = {
+    entry: { form: 'entryForm', edit: 'entryEditId', date: 'entryDate', notice: 'entryEditNotice', save: 'entrySaveButton', create: '保存这段记忆', update: '保存修改', tab: 'timeline' },
+    checkup: { form: 'checkupForm', edit: 'checkupEditId', date: 'checkupDate', notice: 'checkupEditNotice', save: 'checkupSaveButton', title: 'checkupFormTitle', create: '保存体检', update: '保存修改', tab: 'health' },
+    jaundice: { form: 'jaundiceForm', edit: 'jaundiceEditId', date: 'jaundiceDate', notice: 'jaundiceEditNotice', save: 'jaundiceSaveButton', create: '＋ 添加观察', update: '保存修改', tab: 'health' },
+    growth: { form: 'growthForm', edit: 'growthEditId', date: 'growthDate', notice: 'growthEditNotice', save: 'growthSaveButton', title: 'growthFormTitle', create: '保存测量', update: '保存修改', tab: 'growth' },
+};
+function cancelEdit(type) {
+    const config = editForms[type];
+    $(config.form).reset();
+    $(config.edit).value = '';
+    $(config.date).value = today();
+    $(config.notice).hidden = true;
+    $(config.save).textContent = config.create;
+    if (config.title) $(config.title).textContent = type === 'checkup' ? '新增体检记录' : '添加一次测量';
+    document.querySelector(`[data-cancel-edit="${type}"]`).hidden = true;
+    if (type === 'entry') { resetFile('entryMedia', 'entryFileName'); $('entryRemoveMediaWrap').hidden = true; childChecks('entryChildren', state.childId === null ? [] : [state.childId]); renderPrompts(); }
+    if (type === 'checkup') { resetFile('checkupMedia', 'checkupFileName'); $('checkupRemoveMediaWrap').hidden = true; }
+}
+function openRecordEdit(type, id) {
+    const records = { entry: state.entries, checkup: state.checkups, jaundice: state.jaundice, growth: state.growth }[type];
+    const item = records?.find((record) => record.id === id);
+    if (!item) return toast('这条记录未找到，请刷新后重试', true);
+    if (type === 'growth' && item.checkup_id) return openRecordEdit('checkup', item.checkup_id);
+    cancelEdit(type);
+    const config = editForms[type];
+    $(config.edit).value = String(id);
+    $(config.notice).hidden = false;
+    $(config.save).textContent = config.update;
+    if (config.title) $(config.title).textContent = type === 'checkup' ? '修改体检记录' : '修改家庭测量';
+    document.querySelector(`[data-cancel-edit="${type}"]`).hidden = false;
+    if (type === 'entry') {
+        $('entryKind').value = item.kind;
+        $('entryDate').value = dateOnly(item.occurred_at || item.created_at);
+        $('entryAuthor').value = item.author || '家人';
+        $('entryTitle').value = item.title || '';
+        $('entryContent').value = item.content || '';
+        $('entryRemoveMediaWrap').hidden = !item.media_url;
+        childChecks('entryChildren', item.child_ids);
+        renderPrompts();
+    } else if (type === 'checkup') {
+        $('checkupChild').value = item.child_id == null ? $('checkupChild').value : String(item.child_id);
+        $('checkupDate').value = dateOnly(item.checkup_date);
+        $('checkupHospital').value = item.hospital || '';
+        $('checkupWeight').value = item.weight_kg ?? '';
+        $('checkupHeight').value = item.height_cm ?? '';
+        $('checkupHead').value = item.head_cm ?? '';
+        $('checkupNotes').value = item.report_text || '';
+        $('checkupNext').value = dateOnly(item.next_checkup_date);
+        $('checkupNextNotes').value = item.next_checkup_notes || '';
+        $('checkupRemoveMediaWrap').hidden = !item.media_url;
+    } else if (type === 'jaundice') {
+        $('jaundiceChild').value = item.child_id == null ? $('jaundiceChild').value : String(item.child_id);
+        $('jaundiceDate').value = dateOnly(item.record_date);
+        $('jaundiceValue').value = item.value;
+        $('jaundiceNote').value = item.note || '';
+    } else {
+        $('growthChild').value = String(item.child_id);
+        $('growthDate').value = dateOnly(item.measured_at);
+        $('growthWeight').value = item.weight_kg ?? '';
+        $('growthHeight').value = item.height_cm ?? '';
+        $('growthHead').value = item.head_cm ?? '';
+        $('growthNote').value = item.note || '';
+    }
+    switchTab(config.tab);
+    $(config.form).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $(config.date).focus({ preventScroll: true });
+}
 function bindEvents() {
     document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
     document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => switchTab(button.dataset.go)));
@@ -285,6 +355,7 @@ function bindEvents() {
     $('editChildButton').addEventListener('click', () => openChildDialog(selectedChild()));
     $('logoutButton').addEventListener('click', async () => { try { await api('/api/logout', { method: 'POST' }); } finally { location.replace('/login'); } });
     document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => $(button.dataset.close).close()));
+    document.querySelectorAll('[data-cancel-edit]').forEach((button) => button.addEventListener('click', () => cancelEdit(button.dataset.cancelEdit)));
     $('entryKindFilter').addEventListener('change', () => renderTimeline(true));
     $('entryChildren').addEventListener('change', renderPrompts);
     $('growthMetric').addEventListener('change', renderGrowth);
@@ -298,6 +369,8 @@ function bindEvents() {
     $('assignForm').addEventListener('submit', (event) => submitForm(event, saveAssignment));
     $('printStory').addEventListener('click', () => window.print());
     document.body.addEventListener('click', async (event) => {
+        const editor = event.target.closest('[data-edit-record]');
+        if (editor) { openRecordEdit(editor.dataset.editRecord, Number(editor.dataset.recordId)); return; }
         const childButton = event.target.closest('[data-select-child]');
         if (childButton) { state.childId = Number(childButton.dataset.selectChild); state.handbookMonth = null; state.story = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
         const handbookChild = event.target.closest('[data-handbook-child]');
@@ -332,29 +405,37 @@ function bindEvents() {
     });
 }
 async function saveEntry() {
+    const id = $('entryEditId').value;
     const childIds = checkedChildren('entryChildren');
     if (!childIds.length) throw new Error('请至少选择一个宝宝');
     const media = await upload($('entryMedia').files[0]);
-    const payload = { child_ids: childIds, kind: $('entryKind').value, title: $('entryTitle').value.trim() || null, author: $('entryAuthor').value.trim() || '家人', content: $('entryContent').value.trim(), occurred_at: asDateTime($('entryDate').value), media_url: media?.media_url || null, media_type: media?.media_type || null };
-    await api('/api/entries', jsonOptions('POST', payload));
-    $('entryForm').reset(); $('entryDate').value = today(); resetFile('entryMedia', 'entryFileName'); state.story = null;
-    await refresh(); toast('这段成长记忆已保存');
+    const payload = { child_ids: childIds, kind: $('entryKind').value, title: $('entryTitle').value.trim() || null, author: $('entryAuthor').value.trim() || '家人', content: $('entryContent').value.trim(), occurred_at: asDateTime($('entryDate').value) };
+    if (media) { payload.media_url = media.media_url; payload.media_type = media.media_type; }
+    else if (!id || $('entryRemoveMedia').checked) { payload.media_url = null; payload.media_type = null; }
+    await api(id ? `/api/entries/${id}` : '/api/entries', jsonOptions(id ? 'PATCH' : 'POST', payload));
+    cancelEdit('entry'); state.story = null;
+    await refresh(); toast(id ? '成长记录已修改' : '这段成长记忆已保存');
 }
 async function saveCheckup() {
+    const id = $('checkupEditId').value;
     const media = await upload($('checkupMedia').files[0]);
-    const payload = { child_id: Number($('checkupChild').value), checkup_date: asDateTime($('checkupDate').value), hospital: $('checkupHospital').value.trim() || null, report_text: $('checkupNotes').value.trim() || null, media_url: media?.media_url || null, next_checkup_date: asDateTime($('checkupNext').value), next_checkup_notes: $('checkupNextNotes').value.trim() || null, weight_kg: numberOrNull('checkupWeight'), height_cm: numberOrNull('checkupHeight'), head_cm: numberOrNull('checkupHead') };
-    await api('/api/checkups', jsonOptions('POST', payload));
-    $('checkupForm').reset(); $('checkupDate').value = today(); resetFile('checkupMedia', 'checkupFileName'); await refresh(); toast('体检与测量已保存');
+    const payload = { child_id: Number($('checkupChild').value), checkup_date: asDateTime($('checkupDate').value), hospital: $('checkupHospital').value.trim() || null, report_text: $('checkupNotes').value.trim() || null, next_checkup_date: asDateTime($('checkupNext').value), next_checkup_notes: $('checkupNextNotes').value.trim() || null, weight_kg: numberOrNull('checkupWeight'), height_cm: numberOrNull('checkupHeight'), head_cm: numberOrNull('checkupHead') };
+    if (media) payload.media_url = media.media_url;
+    else if (!id || $('checkupRemoveMedia').checked) payload.media_url = null;
+    await api(id ? `/api/checkups/${id}` : '/api/checkups', jsonOptions(id ? 'PATCH' : 'POST', payload));
+    cancelEdit('checkup'); state.story = null; await refresh(); toast(id ? '体检与曲线已更新' : '体检与测量已保存');
 }
 async function saveJaundice() {
-    await api('/api/jaundice', jsonOptions('POST', { child_id: Number($('jaundiceChild').value), record_date: asDateTime($('jaundiceDate').value), value: Number($('jaundiceValue').value), note: $('jaundiceNote').value.trim() || null }));
-    $('jaundiceForm').reset(); $('jaundiceDate').value = today(); await refresh(); toast('黄疸观察已保存');
+    const id = $('jaundiceEditId').value;
+    await api(id ? `/api/jaundice/${id}` : '/api/jaundice', jsonOptions(id ? 'PATCH' : 'POST', { child_id: Number($('jaundiceChild').value), record_date: asDateTime($('jaundiceDate').value), value: Number($('jaundiceValue').value), note: $('jaundiceNote').value.trim() || null }));
+    cancelEdit('jaundice'); await refresh(); toast(id ? '黄疸观察已修改' : '黄疸观察已保存');
 }
 async function saveGrowth() {
+    const id = $('growthEditId').value;
     const payload = { child_id: Number($('growthChild').value), measured_at: asDateTime($('growthDate').value), weight_kg: numberOrNull('growthWeight'), height_cm: numberOrNull('growthHeight'), head_cm: numberOrNull('growthHead'), note: $('growthNote').value.trim() || null };
     if ([payload.weight_kg, payload.height_cm, payload.head_cm].every((value) => value === null)) throw new Error('至少填写一项测量值');
-    await api('/api/growth', jsonOptions('POST', payload));
-    $('growthForm').reset(); $('growthDate').value = today(); await refresh(); toast('测量记录已保存');
+    await api(id ? `/api/growth/${id}` : '/api/growth', jsonOptions(id ? 'PATCH' : 'POST', payload));
+    cancelEdit('growth'); state.story = null; await refresh(); toast(id ? '测量记录已修改' : '测量记录已保存');
 }
 async function generateStory() {
     const ids = checkedChildren('storyChildren');
