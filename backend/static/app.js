@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const state = { children: [], entries: [], checkups: [], jaundice: [], growth: [], suggestions: [], visits: {}, childId: null, story: null };
+const state = { children: [], entries: [], checkups: [], jaundice: [], growth: [], suggestions: [], visits: {}, childId: null, handbookMonth: null, story: null };
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const safeMedia = (url) => /^\/static_uploads\/[a-f0-9]{32}\.(jpg|jpeg|png|gif|webp|mp3|wav|m4a|ogg)$/i.test(url || '') ? url : '';
 const today = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; };
@@ -35,12 +35,21 @@ async function api(url, options = {}) {
 const jsonOptions = (method, data) => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 const queryChild = (item) => state.childId === null || (Array.isArray(item.child_ids) ? item.child_ids.includes(state.childId) : item.child_id === state.childId);
 
+async function allEntries() {
+    const entries = [];
+    while (true) {
+        const page = await api(`/api/entries?skip=${entries.length}&limit=500`);
+        entries.push(...page);
+        if (page.length < 500) return entries;
+    }
+}
+
 async function refresh() {
     const children = await api('/api/children');
     state.children = children;
     if (state.childId !== null && !childById(state.childId)) state.childId = null;
     const [entries, checkups, jaundice, growth, suggestions, plans] = await Promise.all([
-        api('/api/entries?limit=500'), api('/api/checkups'), api('/api/jaundice'), api('/api/growth'), api('/api/moments/suggestions'),
+        allEntries(), api('/api/checkups'), api('/api/jaundice'), api('/api/growth'), api('/api/moments/suggestions'),
         Promise.all(children.map((child) => api(`/api/children/${child.id}/visits`))),
     ]);
     Object.assign(state, { entries, checkups, jaundice, growth, suggestions });
@@ -104,6 +113,61 @@ function mediaHtml(item) {
     const url = safeMedia(item.media_url);
     if (!url) return '';
     return item.media_type === 'audio' ? `<audio class="timeline-media audio" controls src="${url}"></audio>` : `<img class="timeline-media" src="${url}" alt="成长记录照片" loading="lazy">`;
+}
+
+function addBirthMonths(birth, months) {
+    const [year, month, day] = birth.split('-').map(Number);
+    const target = new Date(year, month - 1 + months, 1, 12);
+    target.setDate(Math.min(day, new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()));
+    return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
+}
+function ageMonth(birth, day) {
+    if (day < birth) return -1;
+    const [by, bm] = birth.split('-').map(Number);
+    const [dy, dm] = day.split('-').map(Number);
+    let months = (dy - by) * 12 + dm - bm;
+    if (day < addBirthMonths(birth, months)) months--;
+    return months;
+}
+function chapterLabel(month) {
+    if (month < 0) return '出生前';
+    if (month < 12) return `出生第 ${month + 1} 个月`;
+    return `${Math.floor(month / 12)} 岁${month % 12 ? ` ${month % 12} 个月` : ''}起`;
+}
+function chapterEvents(child) {
+    const items = [];
+    state.entries.filter((item) => item.child_ids.includes(child.id)).forEach((item) => items.push({ type: 'entry', date: dateOnly(item.occurred_at || item.created_at), item }));
+    state.checkups.filter((item) => item.child_id === child.id).forEach((item) => items.push({ type: 'checkup', date: dateOnly(item.checkup_date), item }));
+    state.growth.filter((item) => item.child_id === child.id && !item.checkup_id).forEach((item) => items.push({ type: 'growth', date: dateOnly(item.measured_at), item }));
+    state.jaundice.filter((item) => item.child_id === child.id).forEach((item) => items.push({ type: 'jaundice', date: dateOnly(item.record_date), item }));
+    return items.map((event) => ({ ...event, month: ageMonth(child.birth_date, event.date) })).sort((a, b) => b.date.localeCompare(a.date) || b.item.id - a.item.id);
+}
+function handbookEventHtml(event) {
+    const item = event.item;
+    if (event.type === 'entry') return `<article class="chapter-event"><span class="chapter-event-kind">${item.kind === 'milestone' ? '✦ 关键时刻' : '✎ 成长日记'} · ${prettyDate(event.date)}</span><h3>${esc(item.title || (item.kind === 'milestone' ? '值得纪念的一天' : '这一天的故事'))}</h3>${item.content ? `<p>${esc(item.content)}</p>` : ''}${mediaHtml(item)}${item.child_ids.length > 1 ? '<small>家人共同的记忆</small>' : ''}</article>`;
+    if (event.type === 'checkup') return `<article class="chapter-event"><span class="chapter-event-kind">♡ 体检记录 · ${prettyDate(event.date)}</span><h3>${esc(item.hospital || '一次健康随访')}</h3>${item.report_text ? `<p>${esc(item.report_text)}</p>` : ''}${safeMedia(item.media_url) ? `<img class="timeline-media" src="${safeMedia(item.media_url)}" alt="体检单照片" loading="lazy">` : ''}<div class="record-metrics">${metricPills(item)}</div>${item.next_checkup_date ? `<small>医生建议复查：${prettyDate(item.next_checkup_date)}</small>` : ''}</article>`;
+    if (event.type === 'jaundice') return `<article class="chapter-event"><span class="chapter-event-kind">♡ 黄疸观察 · ${prettyDate(event.date)}</span><h3>记录数值 ${esc(item.value)}</h3>${item.note ? `<p>${esc(item.note)}</p>` : ''}</article>`;
+    return `<article class="chapter-event"><span class="chapter-event-kind">↗ 生长测量 · ${prettyDate(event.date)}</span><h3>一次成长刻度</h3><div class="record-metrics">${metricPills(item)}</div>${item.note ? `<p>${esc(item.note)}</p>` : ''}</article>`;
+}
+function renderHandbook() {
+    const root = $('handbookContent');
+    const child = selectedChild();
+    if (!child) {
+        root.innerHTML = state.children.length ? `<div class="handbook-pick surface"><h3>先翻开一本宝宝的手册</h3><p class="muted">选择宝宝后，就能按月龄回看那些被记录下来的日子。</p><div class="handbook-pick-list">${state.children.map((item) => `<button class="button soft" type="button" data-handbook-child="${item.id}">${esc(item.nickname || item.name)}的手册 →</button>`).join('')}</div></div>` : empty('✧', '先添加宝宝档案，再开始一本成长手册。');
+        return;
+    }
+    const events = chapterEvents(child);
+    const chapterSizes = new Map();
+    events.forEach((event) => chapterSizes.set(event.month, (chapterSizes.get(event.month) || 0) + 1));
+    const currentMonth = Math.max(0, ageMonth(child.birth_date, today()));
+    const months = [...new Set([...events.map((event) => event.month), currentMonth])].sort((a, b) => b - a);
+    if (!months.includes(state.handbookMonth)) state.handbookMonth = currentMonth;
+    const month = state.handbookMonth;
+    const chapter = events.filter((event) => event.month === month);
+    const start = month < 0 ? null : addBirthMonths(child.birth_date, month);
+    const end = month < 0 ? child.birth_date : addBirthMonths(child.birth_date, month + 1);
+    const counts = { entry: chapter.filter((event) => event.type === 'entry').length, checkup: chapter.filter((event) => event.type === 'checkup').length, growth: chapter.filter((event) => event.type === 'growth').length, jaundice: chapter.filter((event) => event.type === 'jaundice').length };
+    root.innerHTML = `<div class="handbook-layout"><aside class="surface handbook-index"><span class="kicker">CHAPTER INDEX</span><h3>${esc(child.nickname || child.name)}的章节</h3><p class="muted">显示有记录的月份和当前月龄。</p><div class="chapter-index-list">${months.map((value) => `<button class="chapter-index-item ${value === month ? 'active' : ''}" type="button" data-chapter-month="${value}" aria-current="${value === month ? 'page' : 'false'}"><span>${esc(chapterLabel(value))}</span><small>${chapterSizes.has(value) ? `${chapterSizes.get(value)} 条` : '待记录'}</small></button>`).join('')}</div></aside><div class="handbook-page"><div class="chapter-cover"><span class="kicker">${esc(child.nickname || child.name)} · GROWING DAYS</span><h2>${esc(chapterLabel(month))}</h2><p>${month < 0 ? `出生于 ${prettyDate(child.birth_date)} 之前` : `${prettyDate(start)} — ${prettyDate(end)} 前`}</p><div class="chapter-counts"><span>${counts.entry} 段回忆</span><span>${counts.checkup} 次体检</span><span>${counts.growth} 次家庭测量</span>${counts.jaundice ? `<span>${counts.jaundice} 条黄疸观察</span>` : ''}</div></div><div class="chapter-actions"><button class="button soft" type="button" data-chapter-write>写一段回忆</button><button class="button ghost" type="button" data-chapter-story>用本章生成故事 ↗</button></div><div class="chapter-event-list">${chapter.length ? chapter.map(handbookEventHtml).join('') : empty('✎', '这一章还没有记录。写下一个真实的瞬间，手册就会多一页。')}</div></div></div>`;
 }
 function renderTimeline(preserveSelection = false) {
     const chosen = preserveSelection ? checkedChildren('entryChildren') : state.childId === null ? [] : [state.childId];
@@ -191,7 +255,7 @@ function renderStory() {
     $('storyPreview').innerHTML = state.story ? storyHtml(state.story) : '';
     $('printRoot').innerHTML = $('storyPreview').innerHTML;
 }
-function render() { renderHeader(); renderOverview(); renderTimeline(); renderHealth(); renderGrowth(); renderStory(); }
+function render() { renderHeader(); renderOverview(); renderHandbook(); renderTimeline(); renderHealth(); renderGrowth(); renderStory(); }
 function switchTab(name) {
     document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.tab === name));
     document.querySelectorAll('.panel').forEach((panel) => panel.classList.toggle('active', panel.id === `panel-${name}`));
@@ -213,7 +277,7 @@ function resetFile(inputId, labelId) { $(inputId).value = ''; $(labelId).textCon
 function bindEvents() {
     document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
     document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => switchTab(button.dataset.go)));
-    $('childFilter').addEventListener('change', (event) => { state.childId = event.target.value === 'all' ? null : Number(event.target.value); state.story = null; render(); });
+    $('childFilter').addEventListener('change', (event) => { state.childId = event.target.value === 'all' ? null : Number(event.target.value); state.handbookMonth = null; state.story = null; render(); });
     $('heroAddMoment').addEventListener('click', () => { switchTab('timeline'); $('entryTitle').focus(); });
     $('heroMakeStory').addEventListener('click', () => switchTab('story'));
     $('addChildButton').addEventListener('click', () => openChildDialog());
@@ -235,7 +299,25 @@ function bindEvents() {
     $('printStory').addEventListener('click', () => window.print());
     document.body.addEventListener('click', async (event) => {
         const childButton = event.target.closest('[data-select-child]');
-        if (childButton) { state.childId = Number(childButton.dataset.selectChild); state.story = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        if (childButton) { state.childId = Number(childButton.dataset.selectChild); state.handbookMonth = null; state.story = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        const handbookChild = event.target.closest('[data-handbook-child]');
+        if (handbookChild) { state.childId = Number(handbookChild.dataset.handbookChild); state.handbookMonth = null; state.story = null; render(); }
+        const chapterButton = event.target.closest('[data-chapter-month]');
+        if (chapterButton) { state.handbookMonth = Number(chapterButton.dataset.chapterMonth); renderHandbook(); }
+        if (event.target.closest('[data-chapter-write]')) { switchTab('timeline'); $('entryTitle').focus(); }
+        if (event.target.closest('[data-chapter-story]')) {
+            const child = selectedChild();
+            const month = state.handbookMonth;
+            if (child && month !== null) {
+                $('storyFrom').value = month < 0 ? '' : addBirthMonths(child.birth_date, month);
+                const end = month < 0 ? child.birth_date : addBirthMonths(child.birth_date, month + 1);
+                const lastDay = new Date(`${end}T12:00:00`); lastDay.setDate(lastDay.getDate() - 1);
+                $('storyTo').value = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+                $('storyTitle').value = '';
+                state.story = null; switchTab('story'); renderStoryForm();
+                try { await generateStory(); } catch (error) { toast(error.message || '故事生成失败', true); }
+            }
+        }
         const assignment = event.target.closest('[data-assign-entry]');
         if (assignment) openAssignDialog(Number(assignment.dataset.assignEntry));
         const promote = event.target.closest('[data-promote-entry]');
@@ -295,6 +377,7 @@ async function saveChild() {
     const payload = { name: $('childName').value.trim(), nickname: $('childNickname').value.trim() || null, birth_date: $('childBirthDate').value, color: $('childColor').value };
     const child = await api(id ? `/api/children/${id}` : '/api/children', jsonOptions(id ? 'PATCH' : 'POST', payload));
     state.childId = child.id;
+    state.handbookMonth = null;
     $('childDialog').close(); await refresh(); toast(id ? '宝宝档案已更新' : '宝宝档案已创建');
 }
 function openAssignDialog(entryId) {

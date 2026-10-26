@@ -39,6 +39,7 @@
 
             <nav class="tabs" aria-label="页面栏目">
                 <button class="tab active" data-tab="overview" type="button">总览</button>
+                <button class="tab" data-tab="handbook" type="button">成长手册</button>
                 <button class="tab" data-tab="timeline" type="button">成长记录</button>
                 <button class="tab" data-tab="health" type="button">健康手册</button>
                 <button class="tab" data-tab="growth" type="button">生长曲线</button>
@@ -53,6 +54,11 @@
                     <article class="surface"><div class="section-heading compact"><div><span class="kicker">THE NEXT CHAPTER</span><h2>健康随访提示</h2></div><button class="inline-action" data-go="health" type="button">打开健康手册 →</button></div><div id="visitPreview"></div><p class="fine-print">按国家 0～6 岁儿童健康管理时间点整理，用于核对手册与预约；具体检查以当地保健机构为准。</p></article>
                     <article class="surface family-card"><span class="kicker">TOGETHER WE GROW</span><h2>我们的宝宝</h2><div id="familyCards"></div><button class="inline-action" id="familyAddChild" type="button">＋ 添加宝宝档案</button></article>
                 </div>
+            </section>
+
+            <section class="panel" id="panel-handbook">
+                <div class="section-heading"><div><span class="kicker">CHAPTER BY CHAPTER</span><h2>按月龄翻阅成长手册</h2><p>把同一阶段的回忆、体检和测量放在一起，慢慢看见成长。</p></div></div>
+                <div id="handbookContent"></div>
             </section>
 
             <section class="panel" id="panel-timeline">
