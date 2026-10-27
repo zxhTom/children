@@ -28,7 +28,7 @@ login_attempts = defaultdict(list)
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     path = request.url.path
-    public = path in ("/login", "/api/login", "/favicon.svg")
+    public = path in ("/login", "/api/login")
     if not public and not auth.valid_session(request.cookies.get(auth.COOKIE_NAME), AUTH_SECRET):
         if path.startswith("/api/") or path.startswith("/static_uploads/"):
             return JSONResponse({"detail": "请先登录"}, status_code=401)
