@@ -156,6 +156,10 @@ function handbookEventHtml(event) {
     if (event.type === 'jaundice') return `<article class="chapter-event"><span class="chapter-event-kind">♡ 黄疸观察 · ${prettyDate(event.date)}</span><h3>记录数值 ${esc(item.value)}</h3>${item.note ? `<p>${esc(item.note)}</p>` : ''}${editButton('jaundice', item.id)}</article>`;
     return `<article class="chapter-event"><span class="chapter-event-kind">↗ 生长测量 · ${prettyDate(event.date)}</span><h3>一次成长刻度</h3><div class="record-metrics">${metricPills(item)}</div>${item.note ? `<p>${esc(item.note)}</p>` : ''}${editButton('growth', item.id)}</article>`;
 }
+function chapterStarterHtml(month) {
+    const prompt = month < 1 ? '这段时间，哪个小小的瞬间最想留给未来？' : month < 12 ? '这个月，有没有一个你舍不得忘记的表情或声音？' : month < 36 ? '最近哪句话、哪个动作，让全家忍不住笑了？' : '这个月，宝宝最喜欢做什么？你们一起经历了什么？';
+    return `<div class="chapter-starter"><div class="chapter-starter-intro"><span class="kicker">A PAGE TO BEGIN</span><span class="chapter-starter-symbol" aria-hidden="true">✳</span><h3>这一章，等你写下第一笔</h3><p>不用一次写完。先留下一段回忆，体检和测量也可以慢慢补齐。</p><div class="chapter-starter-prompt"><span>记录灵感</span><strong>${esc(prompt)}</strong></div></div><div class="chapter-starter-actions"><button type="button" data-chapter-action="entry"><span class="starter-action-icon memory" aria-hidden="true">✎</span><span><strong>写一段回忆</strong><small>记下这段日子的真实瞬间</small></span><span aria-hidden="true">↗</span></button><button type="button" data-chapter-action="checkup"><span class="starter-action-icon care" aria-hidden="true">♡</span><span><strong>补一条体检</strong><small>保存检查单与医生的记录</small></span><span aria-hidden="true">↗</span></button><button type="button" data-chapter-action="growth"><span class="starter-action-icon measure" aria-hidden="true">↗</span><span><strong>记一次测量</strong><small>把身高、体重或头围留在曲线里</small></span><span aria-hidden="true">↗</span></button></div></div>`;
+}
 function renderHandbook() {
     const root = $('handbookContent');
     const child = selectedChild();
@@ -175,20 +179,26 @@ function renderHandbook() {
     const start = month < 0 ? null : addBirthMonths(child.birth_date, month);
     const end = month < 0 ? child.birth_date : addBirthMonths(child.birth_date, month + 1);
     const counts = { entry: chapter.filter((event) => event.type === 'entry').length, checkup: chapter.filter((event) => event.type === 'checkup').length, growth: chapter.filter((event) => event.type === 'growth').length, jaundice: chapter.filter((event) => event.type === 'jaundice').length };
-    root.innerHTML = `<div class="handbook-layout"><aside class="surface handbook-index"><span class="kicker">CHAPTER INDEX</span><h3>${esc(child.nickname || child.name)}的章节</h3><p class="muted">选择任意月龄，补上当时的故事。</p><label class="chapter-jump"><span>跳转到月龄</span><select id="chapterJump">${jumpOptions}</select></label><div class="chapter-index-list">${months.map((value) => `<button class="chapter-index-item ${value === month ? 'active' : ''}" type="button" data-chapter-month="${value}" aria-current="${value === month ? 'page' : 'false'}"><span>${esc(chapterLabel(value))}</span><small>${chapterSizes.has(value) ? `${chapterSizes.get(value)} 条` : '待记录'}</small></button>`).join('')}</div></aside><div class="handbook-page"><div class="chapter-cover"><span class="kicker">${esc(child.nickname || child.name)} · GROWING DAYS</span><h2>${esc(chapterLabel(month))}</h2><p>${month < 0 ? `出生于 ${prettyDate(child.birth_date)} 之前` : `${prettyDate(start)} — ${prettyDate(end)} 前`}</p><div class="chapter-counts"><span>${counts.entry} 段回忆</span><span>${counts.checkup} 次体检</span><span>${counts.growth} 次家庭测量</span>${counts.jaundice ? `<span>${counts.jaundice} 条黄疸观察</span>` : ''}</div></div><div class="chapter-actions"><button class="button ghost" type="button" data-chapter-step="-1" ${month <= first ? 'disabled' : ''}>← 上一章</button><button class="button ghost" type="button" data-chapter-step="1" ${month >= last ? 'disabled' : ''}>下一章 →</button><button class="button soft" type="button" data-chapter-write>写一段回忆</button><button class="button ghost" type="button" data-chapter-story>用本章生成故事 ↗</button></div><div class="chapter-event-list">${chapter.length ? chapter.map(handbookEventHtml).join('') : empty('✎', '这一章还没有记录。写下一个真实的瞬间，手册就会多一页。')}</div></div></div>`;
+    root.innerHTML = `<div class="handbook-layout"><aside class="surface handbook-index"><span class="kicker">CHAPTER INDEX</span><h3>${esc(child.nickname || child.name)}的章节</h3><p class="muted">选择任意月龄，补上当时的故事。</p><label class="chapter-jump"><span>跳转到月龄</span><select id="chapterJump">${jumpOptions}</select></label><div class="chapter-index-list">${months.map((value) => `<button class="chapter-index-item ${value === month ? 'active' : ''}" type="button" data-chapter-month="${value}" aria-current="${value === month ? 'page' : 'false'}"><span>${esc(chapterLabel(value))}</span><small>${chapterSizes.has(value) ? `${chapterSizes.get(value)} 条` : '待记录'}</small></button>`).join('')}</div></aside><div class="handbook-page"><div class="chapter-cover"><span class="kicker">${esc(child.nickname || child.name)} · GROWING DAYS</span><h2>${esc(chapterLabel(month))}</h2><p>${month < 0 ? `出生于 ${prettyDate(child.birth_date)} 之前` : `${prettyDate(start)} — ${prettyDate(end)} 前`}</p><div class="chapter-counts"><span>${counts.entry} 段回忆</span><span>${counts.checkup} 次体检</span><span>${counts.growth} 次家庭测量</span>${counts.jaundice ? `<span>${counts.jaundice} 条黄疸观察</span>` : ''}</div></div><div class="chapter-actions"><button class="button ghost" type="button" data-chapter-step="-1" ${month <= first ? 'disabled' : ''}>← 上一章</button><button class="button ghost" type="button" data-chapter-step="1" ${month >= last ? 'disabled' : ''}>下一章 →</button>${chapter.length ? '<button class="button soft" type="button" data-chapter-write>写一段回忆</button><button class="button ghost" type="button" data-chapter-story>用本章生成故事 ↗</button>' : ''}</div><div class="chapter-event-list">${chapter.length ? chapter.map(handbookEventHtml).join('') : chapterStarterHtml(month)}</div></div></div>`;
 }
-function openChapterDraft() {
+function openChapterForm(type) {
     const child = selectedChild();
     if (!child) return;
-    if ($('entryEditId').value) { switchTab('timeline'); toast('请先保存或取消正在修改的记录'); return; }
+    const config = {
+        entry: { edit: 'entryEditId', date: 'entryDate', focus: 'entryTitle', tab: 'timeline' },
+        checkup: { edit: 'checkupEditId', date: 'checkupDate', focus: 'checkupHospital', child: 'checkupChild', tab: 'health' },
+        growth: { edit: 'growthEditId', date: 'growthDate', focus: 'growthWeight', child: 'growthChild', tab: 'growth' },
+    }[type];
+    if (!config) return;
+    if ($(config.edit).value) { switchTab(config.tab); toast('请先保存或取消正在修改的记录'); return; }
     const current = ageMonth(child.birth_date, today());
     const isCurrent = state.handbookMonth === current;
-    $('entryDate').value = isCurrent ? today() : '';
-    childChecks('entryChildren', [child.id]);
-    renderPrompts();
-    switchTab('timeline');
-    $(isCurrent ? 'entryTitle' : 'entryDate').focus({ preventScroll: true });
-    if (!isCurrent) toast('请填写这段回忆真实发生的日期');
+    $(config.date).value = isCurrent ? today() : '';
+    if (type === 'entry') { childChecks('entryChildren', [child.id]); renderPrompts(); }
+    else $(config.child).value = String(child.id);
+    switchTab(config.tab);
+    $(isCurrent ? config.focus : config.date).focus({ preventScroll: true });
+    if (!isCurrent) toast('请填写这条记录真实发生的日期');
 }
 function renderTimeline(preserveSelection = false) {
     const chosen = preserveSelection || $('entryEditId').value ? checkedChildren('entryChildren') : state.childId === null ? [] : [state.childId];
@@ -400,7 +410,9 @@ function bindEvents() {
         if (chapterButton) { state.handbookMonth = Number(chapterButton.dataset.chapterMonth); renderHandbook(); }
         const chapterStep = event.target.closest('[data-chapter-step]');
         if (chapterStep) { state.handbookMonth += Number(chapterStep.dataset.chapterStep); renderHandbook(); }
-        if (event.target.closest('[data-chapter-write]')) openChapterDraft();
+        if (event.target.closest('[data-chapter-write]')) openChapterForm('entry');
+        const chapterAction = event.target.closest('[data-chapter-action]');
+        if (chapterAction) openChapterForm(chapterAction.dataset.chapterAction);
         if (event.target.closest('[data-chapter-story]')) {
             const child = selectedChild();
             const month = state.handbookMonth;
