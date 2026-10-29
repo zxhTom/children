@@ -137,6 +137,10 @@ function chapterLabel(month) {
     if (month < 12) return `出生第 ${month + 1} 个月`;
     return `${Math.floor(month / 12)} 岁${month % 12 ? ` ${month % 12} 个月` : ''}起`;
 }
+function chapterBounds(child, events) {
+    const current = Math.max(0, ageMonth(child.birth_date, today()));
+    return { current, first: events.some((event) => event.month < 0) ? -1 : 0, last: Math.max(current, ...events.map((event) => event.month)) };
+}
 function chapterEvents(child) {
     const items = [];
     state.entries.filter((item) => item.child_ids.includes(child.id)).forEach((item) => items.push({ type: 'entry', date: dateOnly(item.occurred_at || item.created_at), item }));
@@ -162,15 +166,29 @@ function renderHandbook() {
     const events = chapterEvents(child);
     const chapterSizes = new Map();
     events.forEach((event) => chapterSizes.set(event.month, (chapterSizes.get(event.month) || 0) + 1));
-    const currentMonth = Math.max(0, ageMonth(child.birth_date, today()));
-    const months = [...new Set([...events.map((event) => event.month), currentMonth])].sort((a, b) => b - a);
-    if (!months.includes(state.handbookMonth)) state.handbookMonth = currentMonth;
+    const { current, first, last } = chapterBounds(child, events);
+    if (!Number.isInteger(state.handbookMonth) || state.handbookMonth < first || state.handbookMonth > last) state.handbookMonth = current;
+    const months = [...new Set([...events.map((event) => event.month), current, state.handbookMonth])].sort((a, b) => b - a);
     const month = state.handbookMonth;
+    const jumpOptions = Array.from({ length: last - first + 1 }, (_, index) => last - index).map((value) => `<option value="${value}" ${value === month ? 'selected' : ''}>${esc(chapterLabel(value))}${chapterSizes.has(value) ? ` · ${chapterSizes.get(value)} 条记录` : ''}</option>`).join('');
     const chapter = events.filter((event) => event.month === month);
     const start = month < 0 ? null : addBirthMonths(child.birth_date, month);
     const end = month < 0 ? child.birth_date : addBirthMonths(child.birth_date, month + 1);
     const counts = { entry: chapter.filter((event) => event.type === 'entry').length, checkup: chapter.filter((event) => event.type === 'checkup').length, growth: chapter.filter((event) => event.type === 'growth').length, jaundice: chapter.filter((event) => event.type === 'jaundice').length };
-    root.innerHTML = `<div class="handbook-layout"><aside class="surface handbook-index"><span class="kicker">CHAPTER INDEX</span><h3>${esc(child.nickname || child.name)}的章节</h3><p class="muted">显示有记录的月份和当前月龄。</p><div class="chapter-index-list">${months.map((value) => `<button class="chapter-index-item ${value === month ? 'active' : ''}" type="button" data-chapter-month="${value}" aria-current="${value === month ? 'page' : 'false'}"><span>${esc(chapterLabel(value))}</span><small>${chapterSizes.has(value) ? `${chapterSizes.get(value)} 条` : '待记录'}</small></button>`).join('')}</div></aside><div class="handbook-page"><div class="chapter-cover"><span class="kicker">${esc(child.nickname || child.name)} · GROWING DAYS</span><h2>${esc(chapterLabel(month))}</h2><p>${month < 0 ? `出生于 ${prettyDate(child.birth_date)} 之前` : `${prettyDate(start)} — ${prettyDate(end)} 前`}</p><div class="chapter-counts"><span>${counts.entry} 段回忆</span><span>${counts.checkup} 次体检</span><span>${counts.growth} 次家庭测量</span>${counts.jaundice ? `<span>${counts.jaundice} 条黄疸观察</span>` : ''}</div></div><div class="chapter-actions"><button class="button soft" type="button" data-chapter-write>写一段回忆</button><button class="button ghost" type="button" data-chapter-story>用本章生成故事 ↗</button></div><div class="chapter-event-list">${chapter.length ? chapter.map(handbookEventHtml).join('') : empty('✎', '这一章还没有记录。写下一个真实的瞬间，手册就会多一页。')}</div></div></div>`;
+    root.innerHTML = `<div class="handbook-layout"><aside class="surface handbook-index"><span class="kicker">CHAPTER INDEX</span><h3>${esc(child.nickname || child.name)}的章节</h3><p class="muted">选择任意月龄，补上当时的故事。</p><label class="chapter-jump"><span>跳转到月龄</span><select id="chapterJump">${jumpOptions}</select></label><div class="chapter-index-list">${months.map((value) => `<button class="chapter-index-item ${value === month ? 'active' : ''}" type="button" data-chapter-month="${value}" aria-current="${value === month ? 'page' : 'false'}"><span>${esc(chapterLabel(value))}</span><small>${chapterSizes.has(value) ? `${chapterSizes.get(value)} 条` : '待记录'}</small></button>`).join('')}</div></aside><div class="handbook-page"><div class="chapter-cover"><span class="kicker">${esc(child.nickname || child.name)} · GROWING DAYS</span><h2>${esc(chapterLabel(month))}</h2><p>${month < 0 ? `出生于 ${prettyDate(child.birth_date)} 之前` : `${prettyDate(start)} — ${prettyDate(end)} 前`}</p><div class="chapter-counts"><span>${counts.entry} 段回忆</span><span>${counts.checkup} 次体检</span><span>${counts.growth} 次家庭测量</span>${counts.jaundice ? `<span>${counts.jaundice} 条黄疸观察</span>` : ''}</div></div><div class="chapter-actions"><button class="button ghost" type="button" data-chapter-step="-1" ${month <= first ? 'disabled' : ''}>← 上一章</button><button class="button ghost" type="button" data-chapter-step="1" ${month >= last ? 'disabled' : ''}>下一章 →</button><button class="button soft" type="button" data-chapter-write>写一段回忆</button><button class="button ghost" type="button" data-chapter-story>用本章生成故事 ↗</button></div><div class="chapter-event-list">${chapter.length ? chapter.map(handbookEventHtml).join('') : empty('✎', '这一章还没有记录。写下一个真实的瞬间，手册就会多一页。')}</div></div></div>`;
+}
+function openChapterDraft() {
+    const child = selectedChild();
+    if (!child) return;
+    if ($('entryEditId').value) { switchTab('timeline'); toast('请先保存或取消正在修改的记录'); return; }
+    const current = ageMonth(child.birth_date, today());
+    const isCurrent = state.handbookMonth === current;
+    $('entryDate').value = isCurrent ? today() : '';
+    childChecks('entryChildren', [child.id]);
+    renderPrompts();
+    switchTab('timeline');
+    $(isCurrent ? 'entryTitle' : 'entryDate').focus({ preventScroll: true });
+    if (!isCurrent) toast('请填写这段回忆真实发生的日期');
 }
 function renderTimeline(preserveSelection = false) {
     const chosen = preserveSelection || $('entryEditId').value ? checkedChildren('entryChildren') : state.childId === null ? [] : [state.childId];
@@ -348,6 +366,9 @@ function bindEvents() {
     document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
     document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => switchTab(button.dataset.go)));
     $('childFilter').addEventListener('change', (event) => { state.childId = event.target.value === 'all' ? null : Number(event.target.value); state.handbookMonth = null; state.story = null; render(); });
+    $('handbookContent').addEventListener('change', (event) => {
+        if (event.target.id === 'chapterJump') { state.handbookMonth = Number(event.target.value); renderHandbook(); }
+    });
     $('heroAddMoment').addEventListener('click', () => { switchTab('timeline'); $('entryTitle').focus(); });
     $('heroMakeStory').addEventListener('click', () => switchTab('story'));
     $('addChildButton').addEventListener('click', () => openChildDialog());
@@ -377,7 +398,9 @@ function bindEvents() {
         if (handbookChild) { state.childId = Number(handbookChild.dataset.handbookChild); state.handbookMonth = null; state.story = null; render(); }
         const chapterButton = event.target.closest('[data-chapter-month]');
         if (chapterButton) { state.handbookMonth = Number(chapterButton.dataset.chapterMonth); renderHandbook(); }
-        if (event.target.closest('[data-chapter-write]')) { switchTab('timeline'); $('entryTitle').focus(); }
+        const chapterStep = event.target.closest('[data-chapter-step]');
+        if (chapterStep) { state.handbookMonth += Number(chapterStep.dataset.chapterStep); renderHandbook(); }
+        if (event.target.closest('[data-chapter-write]')) openChapterDraft();
         if (event.target.closest('[data-chapter-story]')) {
             const child = selectedChild();
             const month = state.handbookMonth;
