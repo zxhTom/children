@@ -21,6 +21,8 @@ assert.match(html, /<option value="5" selected>/);
 assert.match(html, /data-chapter-month="5"/);
 assert.match(html, /data-chapter-step="-1"/);
 assert.match(html, /data-chapter-step="1"/);
+assert.match(html, /data-chapter-year="2"/);
+assert.doesNotMatch(html, /<option value="20"/);
 assert.match(html, /data-chapter-action="entry"/);
 assert.match(html, /data-chapter-action="checkup"/);
 assert.match(html, /data-chapter-action="growth"/);
@@ -43,4 +45,10 @@ assert.equal(node('growthChild').value, '3');
 
 vm.runInContext(`state.handbookMonth = ageMonth('2024-01-31', today()); openChapterForm('entry');`, context);
 assert.equal(node('entryDate').value, vm.runInContext('today()', context));
+
+vm.runInContext(`state.children = [{ id: 3, name: '哥哥', birth_date: '2020-09-26' }]; state.handbookMonth = 36; renderHandbook();`, context);
+const olderHtml = node('handbookContent').innerHTML;
+assert.match(olderHtml, /data-chapter-year="6"/);
+assert.match(olderHtml, /<option value="36" selected>/);
+assert.doesNotMatch(olderHtml, /<option value="60"/);
 console.log('handbook navigation and draft flow passed');
