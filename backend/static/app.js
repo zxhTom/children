@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const state = { children: [], entries: [], checkups: [], jaundice: [], growth: [], suggestions: [], visits: {}, childId: null, handbookMonth: null, story: null };
+const state = { children: [], entries: [], checkups: [], jaundice: [], growth: [], suggestions: [], visits: {}, childId: null, handbookMonth: null, story: null, importPreview: null };
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const safeMedia = (url) => /^\/static_uploads\/[a-f0-9]{32}\.(jpg|jpeg|png|gif|webp|mp3|wav|m4a|ogg)$/i.test(url || '') ? url : '';
 const today = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; };
@@ -86,6 +86,7 @@ function renderHeader() {
     $('heroTitle').textContent = child ? `${child.nickname || child.name}的每一步，都值得珍藏。` : '把每一步成长，留给未来的我们。';
     $('heroSubtitle').textContent = child ? `${child.name} · ${ageText(child.birth_date)} · 出生于 ${prettyDate(child.birth_date)}` : '从第一声笑，到一起长大的每一天，都有地方安放。';
     $('editChildButton').hidden = !child;
+    $('importOpenButton').hidden = !child;
     document.documentElement.style.setProperty('--accent', child?.color || '#d97757');
     const entries = state.entries.filter(queryChild);
     $('statEntries').textContent = entries.length;
@@ -389,6 +390,10 @@ function bindEvents() {
     $('addChildButton').addEventListener('click', () => openChildDialog());
     $('familyAddChild').addEventListener('click', () => openChildDialog());
     $('editChildButton').addEventListener('click', () => openChildDialog(selectedChild()));
+    $('importOpenButton').addEventListener('click', openImportDialog);
+    $('importFile').addEventListener('change', resetImportPreview);
+    $('importPreviewButton').addEventListener('click', previewImport);
+    $('importCommitButton').addEventListener('click', commitImport);
     $('logoutButton').addEventListener('click', async () => { try { await api('/api/logout', { method: 'POST' }); } finally { location.replace('/login'); } });
     document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => $(button.dataset.close).close()));
     document.querySelectorAll('[data-cancel-edit]').forEach((button) => button.addEventListener('click', () => cancelEdit(button.dataset.cancelEdit)));
@@ -485,6 +490,72 @@ async function generateStory() {
     state.story = await api('/api/stories/generate', jsonOptions('POST', { child_ids: ids, from_date: $('storyFrom').value || null, to_date: $('storyTo').value || null, title: $('storyTitle').value.trim() || null }));
     renderStory(); toast('成长故事已生成');
     $('storyResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function resetImportPreview() {
+    state.importPreview = null;
+    $('importResult').innerHTML = '';
+    $('importResult').classList.remove('error');
+    $('importCommitButton').hidden = true;
+    $('importCommitButton').disabled = true;
+    $('importPreviewButton').disabled = !$('importFile').files.length;
+}
+function openImportDialog() {
+    const child = selectedChild();
+    if (!child) return toast('请先选择一个宝宝', true);
+    $('importFile').value = '';
+    $('importTarget').textContent = `本次记录将全部归入「${child.nickname || child.name}」的成长手册。`;
+    resetImportPreview();
+    $('importDialog').showModal();
+}
+async function importRequest(action) {
+    const file = $('importFile').files[0];
+    if (!file) throw new Error('请先选择填好的 CSV 文件');
+    if (file.size > 2 * 1024 * 1024) throw new Error('文件不能超过 2 MB');
+    const form = new FormData();
+    form.append('child_id', String(state.childId));
+    form.append('file', file);
+    if (action === 'commit') form.append('file_hash', state.importPreview.file_hash);
+    const response = await fetch(`/api/import/${action}`, { method: 'POST', body: form });
+    if (response.status === 401) { location.replace('/login'); throw new Error('登录已过期'); }
+    const data = await response.json();
+    if (!response.ok) {
+        const errors = Array.isArray(data.detail?.errors) ? data.detail.errors : [typeof data.detail === 'string' ? data.detail : '文件处理失败'];
+        const error = new Error(errors[0]);
+        error.details = errors;
+        throw error;
+    }
+    return data;
+}
+function showImportError(error, heading = '请修改模板后重新预览') {
+    $('importResult').classList.add('error');
+    $('importResult').innerHTML = `<h3>${esc(heading)}</h3><ul>${(error.details || [error.message]).map((message) => `<li>${esc(message)}</li>`).join('')}</ul>`;
+}
+async function previewImport() {
+    resetImportPreview();
+    const button = $('importPreviewButton');
+    button.disabled = true;
+    try {
+        const preview = await importRequest('preview');
+        state.importPreview = preview;
+        const counts = Object.entries(preview.counts).filter(([, count]) => count).map(([name, count]) => `<span>${esc(name)} ${count} 条</span>`).join('');
+        $('importResult').innerHTML = `<h3>将导入到「${esc(preview.child_name)}」：共 ${preview.total} 条</h3><div class="import-counts">${counts}</div><ul>${preview.samples.map((item) => `<li>${esc(item.date)} · ${esc(item.type)} · ${esc(item.summary)}</li>`).join('')}</ul>${preview.total > preview.samples.length ? `<p>只展示前 ${preview.samples.length} 条，确认后将导入全部记录。</p>` : ''}`;
+        $('importCommitButton').hidden = false;
+        $('importCommitButton').disabled = false;
+    } catch (error) { showImportError(error); }
+    finally { button.disabled = !$('importFile').files.length; }
+}
+async function commitImport() {
+    if (!state.importPreview) return;
+    const button = $('importCommitButton');
+    button.disabled = true;
+    try {
+        const result = await importRequest('commit');
+        $('importDialog').close();
+        state.importPreview = null;
+        state.story = null;
+        await refresh();
+        toast(`已为${result.child_name}导入 ${result.created} 条记录`);
+    } catch (error) { showImportError(error, '导入未完成'); button.disabled = false; }
 }
 function openChildDialog(child = null) {
     $('childForm').reset(); $('childEditId').value = child?.id || '';

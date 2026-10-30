@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Date, DateTime, Float, ForeignKey, Integer, String, Table, Text
+from sqlalchemy import Column, Date, DateTime, Float, ForeignKey, Integer, String, Table, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -44,6 +44,17 @@ class JournalEntry(Base):
     @property
     def child_ids(self):
         return [child.id for child in self.children]
+
+
+class ImportBatch(Base):
+    __tablename__ = "import_batches"
+    __table_args__ = (UniqueConstraint("child_id", "file_hash"),)
+
+    id = Column(Integer, primary_key=True)
+    child_id = Column(Integer, ForeignKey("children.id"), nullable=False)
+    file_hash = Column(String(64), nullable=False)
+    row_count = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
 
 
 class MedicalCheckup(Base):

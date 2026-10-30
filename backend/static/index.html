@@ -57,7 +57,7 @@
             </section>
 
             <section class="panel" id="panel-handbook">
-                <div class="section-heading"><div><span class="kicker">CHAPTER BY CHAPTER</span><h2>按月龄翻阅成长手册</h2><p>把同一阶段的回忆、体检和测量放在一起，慢慢看见成长。</p></div></div>
+                <div class="section-heading"><div><span class="kicker">CHAPTER BY CHAPTER</span><h2>按月龄翻阅成长手册</h2><p>把同一阶段的回忆、体检和测量放在一起，慢慢看见成长。</p></div><button class="button soft" id="importOpenButton" type="button" hidden>⇪ 模板批量补录</button></div>
                 <div id="handbookContent"></div>
             </section>
 
@@ -103,6 +103,7 @@
 
     <dialog id="childDialog" class="modal"><form id="childForm" class="modal-body"><button class="close-modal" type="button" data-close="childDialog" aria-label="关闭">×</button><span class="kicker">OUR LITTLE ONE</span><h2 id="childDialogTitle">添加宝宝档案</h2><input id="childEditId" type="hidden"><div class="field"><label for="childName">宝宝姓名 <span class="required">*</span></label><input id="childName" type="text" maxlength="80" required placeholder="宝宝姓名"></div><div class="field"><label for="childNickname">昵称</label><input id="childNickname" type="text" maxlength="80" placeholder="比如：妹妹 / 小星星"></div><div class="form-row"><div class="field grow"><label for="childBirthDate">出生日期 <span class="required">*</span></label><input id="childBirthDate" type="date" required></div><div class="field color-field"><label for="childColor">档案颜色</label><input id="childColor" type="color" value="#d97757"></div></div><button class="button primary full" type="submit">保存宝宝档案</button></form></dialog>
     <dialog id="assignDialog" class="modal"><form id="assignForm" class="modal-body"><button class="close-modal" type="button" data-close="assignDialog" aria-label="关闭">×</button><span class="kicker">LINK THIS MEMORY</span><h2>关联宝宝</h2><p class="muted" id="assignDescription"></p><input id="assignEntryId" type="hidden"><div id="assignChildren" class="child-checks"></div><button class="button primary full" type="submit">保存关联</button></form></dialog>
+    <dialog id="importDialog" class="modal import-modal"><div class="modal-body"><button class="close-modal" type="button" data-close="importDialog" aria-label="关闭">×</button><span class="kicker">FILL IN THE YEARS</span><h2>用模板批量补录</h2><p id="importTarget" class="muted"></p><ol class="import-steps"><li>下载空白 CSV 模板，用 Excel 或表格软件填写。</li><li>每行一条记录；类型填“回忆”“关键时刻”“体检”或“测量”，日期填 YYYY-MM-DD。</li><li>上传后先检查预览，确认无误再导入。照片和语音可在导入后逐条添加。</li></ol><a class="button soft" id="importTemplateLink" href="/api/import/template" download="children-growth-template.csv">↓ 下载空白模板</a><div class="field import-file-field"><label for="importFile">选择填好的 CSV 文件</label><input id="importFile" type="file" accept=".csv,text/csv"><small>请保存为 UTF-8 CSV；最多 1000 行、2 MB。日期需要具体到日。</small></div><div id="importResult" class="import-result" aria-live="polite"></div><div class="import-controls"><button class="button ghost" id="importPreviewButton" type="button" disabled>检查并预览</button><button class="button primary" id="importCommitButton" type="button" hidden disabled>确认导入</button></div></div></dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <div id="printRoot"></div>
 </body>

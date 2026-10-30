@@ -2,11 +2,13 @@ import calendar
 from collections import OrderedDict
 from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import Response
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import models, schemas
+from . import import_csv, models, schemas
 from .database import get_db
 
 router = APIRouter(prefix="/api")
@@ -33,6 +35,68 @@ def require_children(db: Session, child_ids: list[int]) -> list[models.Child]:
 def require_measurement(weight, height, head):
     if all(value is None for value in (weight, height, head)):
         raise HTTPException(status_code=422, detail="至少填写一项生长测量数据")
+
+
+async def read_import_file(file: UploadFile):
+    if not (file.filename or "").lower().endswith(".csv"):
+        raise HTTPException(status_code=422, detail="请选择 CSV 模板文件")
+    data = await file.read(import_csv.MAX_BYTES + 1)
+    try:
+        return import_csv.parse_csv(data)
+    except import_csv.ImportErrorDetails as error:
+        raise HTTPException(status_code=422, detail={"errors": error.errors})
+
+
+@router.get("/import/template")
+def download_import_template():
+    return Response(import_csv.template_bytes(), media_type="text/csv; charset=utf-8", headers={
+        "Content-Disposition": 'attachment; filename="children-growth-template.csv"',
+    })
+
+
+@router.post("/import/preview")
+async def preview_import(child_id: int = Form(...), file: UploadFile = File(...), db: Session = Depends(get_db)):
+    child = require_child(db, child_id)
+    records, file_hash = await read_import_file(file)
+    return {"child_id": child.id, "child_name": child.nickname or child.name,
+            "file_hash": file_hash, **import_csv.import_summary(records)}
+
+
+@router.post("/import/commit")
+async def commit_import(child_id: int = Form(...), file_hash: str = Form(...),
+                        file: UploadFile = File(...), db: Session = Depends(get_db)):
+    child = require_child(db, child_id)
+    records, actual_hash = await read_import_file(file)
+    if actual_hash != file_hash:
+        raise HTTPException(status_code=409, detail="文件已变化，请重新预览")
+    if db.query(models.ImportBatch).filter_by(child_id=child.id, file_hash=actual_hash).first():
+        raise HTTPException(status_code=409, detail="这份文件已经导入过，请勿重复导入")
+    try:
+        db.add(models.ImportBatch(child_id=child.id, file_hash=actual_hash, row_count=len(records)))
+        for record in records:
+            values = {key: record[key] for key in ("weight_kg", "height_cm", "head_cm")}
+            if record["kind"] in ("entry", "milestone"):
+                db.add(models.JournalEntry(children=[child], kind="milestone" if record["kind"] == "milestone" else "diary",
+                                           occurred_at=record["date"], title=record["title"],
+                                           content=record["note"] or "", author=record["author"]))
+            elif record["kind"] == "checkup":
+                checkup = models.MedicalCheckup(child_id=child.id, checkup_date=record["date"],
+                                                hospital=record["hospital"], report_text=record["note"],
+                                                next_checkup_date=record["followup"], **values)
+                db.add(checkup)
+                db.flush()
+                if any(value is not None for value in values.values()):
+                    db.add(models.GrowthRecord(child_id=child.id, checkup_id=checkup.id,
+                                               measured_at=record["date"], note=record["hospital"], **values))
+            else:
+                db.add(models.GrowthRecord(child_id=child.id, measured_at=record["date"],
+                                           note=record["note"], **values))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="这份文件已经导入过，请勿重复导入")
+    return {"created": len(records), "child_name": child.nickname or child.name,
+            "counts": import_csv.import_summary(records)["counts"]}
 
 
 @router.get("/children", response_model=list[schemas.ChildOut])
