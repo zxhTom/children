@@ -1,0 +1,55 @@
+name: Build iPhone IPA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios/Children/**'
+      - '.github/workflows/build-ios.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  iphone:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Build unsigned iPhone application
+        shell: bash
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/Children/Children.xcodeproj \
+            -scheme Children \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/children-build" \
+            CODE_SIGNING_ALLOWED=NO \
+            build > "$RUNNER_TEMP/children-build.log" 2>&1 || {
+              grep -nE 'error:|BUILD FAILED|SwiftCompile|warning:' "$RUNNER_TEMP/children-build.log" | tail -100 || true
+              exit 1
+            }
+          tail -12 "$RUNNER_TEMP/children-build.log"
+      - name: Package standard IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/children-build/Build/Products/Release-iphoneos/Children.app"
+          test -f "$app/Info.plist"
+          plutil -lint "$app/Info.plist"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$app" "$RUNNER_TEMP/ipa/Payload/Children.app"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/Children-unsigned.ipa" Payload)
+          unzip -tq "$GITHUB_WORKSPACE/Children-unsigned.ipa"
+          shasum -a 256 "$GITHUB_WORKSPACE/Children-unsigned.ipa"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Children-iPhone-IPA
+          path: Children-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7

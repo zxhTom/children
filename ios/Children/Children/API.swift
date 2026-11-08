@@ -3,6 +3,7 @@ import SwiftUI
 import WebKit
 
 private let baseURL = URL(string: "https://children.port.toms.chat")!
+private func endpoint(_ path: String) -> URL { URL(string: path, relativeTo: baseURL)!.absoluteURL }
 
 struct Child: Codable, Identifiable, Hashable {
     let id: Int
@@ -51,7 +52,7 @@ struct APIError: Decodable { let detail: String }
         working = true; error = nil
         defer { working = false }
         do {
-            var request = URLRequest(url: baseURL.appending(path: "/api/login"))
+            var request = URLRequest(url: endpoint("/api/login"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: ["username": username, "password": password, "remember_me": true])
@@ -63,7 +64,7 @@ struct APIError: Decodable { let detail: String }
     }
 
     func logout() async {
-        var request = URLRequest(url: baseURL.appending(path: "/api/logout"))
+        var request = URLRequest(url: endpoint("/api/logout"))
         request.httpMethod = "POST"
         _ = try? await URLSession.shared.data(for: request)
         for cookie in HTTPCookieStorage.shared.cookies ?? [] { HTTPCookieStorage.shared.deleteCookie(cookie) }
@@ -79,13 +80,13 @@ struct APIError: Decodable { let detail: String }
     }
 
     func get<T: Decodable>(_ path: String) async throws -> T {
-        let (data, response) = try await URLSession.shared.data(from: baseURL.appending(path: path))
+        let (data, response) = try await URLSession.shared.data(from: endpoint(path))
         try check(response, data: data)
         return try JSONDecoder().decode(T.self, from: data)
     }
 
     func send<T: Decodable, B: Encodable>(_ path: String, method: String, body: B) async throws -> T {
-        var request = URLRequest(url: baseURL.appending(path: path))
+        var request = URLRequest(url: endpoint(path))
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
@@ -96,7 +97,7 @@ struct APIError: Decodable { let detail: String }
 
     func transcribe(_ file: URL) async throws -> String {
         let boundary = UUID().uuidString
-        var request = URLRequest(url: baseURL.appending(path: "/api/care/transcribe"))
+        var request = URLRequest(url: endpoint("/api/care/transcribe"))
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         var body = Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"care.m4a\"\r\nContent-Type: audio/mp4\r\n\r\n".utf8)

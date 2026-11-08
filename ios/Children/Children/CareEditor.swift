@@ -8,7 +8,10 @@ import Speech
     private var url: URL?
 
     func start() async throws {
-        guard await AVAudioApplication.requestRecordPermission() else {
+        let permitted: Bool = await withCheckedContinuation { continuation in
+            AVAudioSession.sharedInstance().requestRecordPermission { continuation.resume(returning: $0) }
+        }
+        guard permitted else {
             throw NSError(domain: "Voice", code: 1, userInfo: [NSLocalizedDescriptionKey: "请在系统设置中允许使用麦克风"])
         }
         try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
@@ -50,7 +53,7 @@ struct CareEditor: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     Text("给这一天留个小记号").font(.system(size: 24, weight: .bold, design: .serif)).foregroundStyle(Palette.ink)
@@ -79,7 +82,7 @@ struct CareEditor: View {
                     }.padding(17).background(.white, in: RoundedRectangle(cornerRadius: 16))
                     VStack(alignment: .leading, spacing: 9) {
                         Text("补充说明").font(.subheadline.weight(.semibold))
-                        TextEditor(text: $note).frame(height: 85).scrollContentBackground(.hidden)
+                        TextEditor(text: $note).frame(height: 85)
                     }.padding(17).background(.white, in: RoundedRectangle(cornerRadius: 16))
                     VStack(alignment: .leading, spacing: 10) {
                         Button { Task { await toggleRecording() } } label: {
@@ -91,7 +94,7 @@ struct CareEditor: View {
                             .font(.caption).foregroundStyle(.secondary)
                         if !transcript.isEmpty {
                             Text("识别文字").font(.caption.weight(.bold))
-                            TextEditor(text: $transcript).frame(height: 85).scrollContentBackground(.hidden).padding(8).background(.white, in: RoundedRectangle(cornerRadius: 10))
+                            TextEditor(text: $transcript).frame(height: 85).padding(8).background(.white, in: RoundedRectangle(cornerRadius: 10))
                             Button("根据文字填写") { applyTranscript() }.font(.subheadline.weight(.semibold))
                         }
                     }
@@ -103,8 +106,8 @@ struct CareEditor: View {
             }
             .background(Palette.paper)
             .navigationTitle(event == nil ? "添加照护记录" : "修改照护记录").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
-        }
+            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("完成") { dismiss() } } }
+        }.navigationViewStyle(.stack)
     }
 
     private func toggleRecording() async {

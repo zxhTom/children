@@ -50,7 +50,7 @@ struct HomeView: View {
 struct SettingsView: View {
     @EnvironmentObject private var session: FamilySession
     var body: some View {
-        NavigationStack {
+        NavigationView {
             List {
                 Section("宝宝档案") {
                     ForEach(session.children) { child in
@@ -61,7 +61,7 @@ struct SettingsView: View {
                 Section { Button("退出登录", role: .destructive) { Task { await session.logout() } } }
             }
             .navigationTitle("我的家庭")
-        }
+        }.navigationViewStyle(.stack)
     }
 }
 
@@ -89,7 +89,7 @@ struct CareView: View {
     private let kinds = [("feeding", "吃奶", "🍼"), ("poop", "臭臭", "💩"), ("pee", "尿尿", "💧"), ("sleep", "睡觉", "☾"), ("wake", "醒了", "☀"), ("other", "其他", "✦")]
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -147,8 +147,10 @@ struct CareView: View {
             .navigationTitle("日常照护").navigationBarTitleDisplayMode(.inline)
             .toolbar { Button("今天") { day = Date(); Task { await load() } } }
             .sheet(isPresented: $editor, onDismiss: { Task { await load() } }) { CareEditor(event: editing, day: day) }
-            .task(id: "\(session.selectedChild?.id ?? 0)-\(localDateTime(day).prefix(10))") { await load() }
-        }
+            .onAppear { Task { await load() } }
+            .onChange(of: session.selectedChild?.id) { _ in Task { await load() } }
+            .onChange(of: day) { _ in Task { await load() } }
+        }.navigationViewStyle(.stack)
     }
 
     private func summary(_ title: String, _ count: Int, _ icon: String) -> some View {
