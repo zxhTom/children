@@ -34,7 +34,10 @@ def list_care(child_id: int, day: date, db: Session = Depends(get_db)):
 @router.post("/care", response_model=schemas.CareOut)
 def create_care(payload: schemas.CareCreate, db: Session = Depends(get_db)):
     require_child(db, payload.child_id)
-    event = models.CareEvent(**payload.model_dump())
+    values = payload.model_dump()
+    if values["kind"] != "feeding":
+        values["amount_ml"] = None
+    event = models.CareEvent(**values)
     db.add(event)
     db.commit()
     db.refresh(event)
@@ -53,6 +56,8 @@ def update_care(event_id: int, payload: schemas.CareUpdate, db: Session = Depend
         require_child(db, updates["child_id"])
     for key, value in updates.items():
         setattr(event, key, value)
+    if event.kind != "feeding":
+        event.amount_ml = None
     db.commit()
     db.refresh(event)
     return event

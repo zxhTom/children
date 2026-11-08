@@ -32,7 +32,7 @@ def main():
         assert client.get(f"/api/care?child_id={child_id}&day=2026-11-09").json() == []
         assert client.post("/api/care", json={**payload, "kind": "bad"}).status_code == 422
         assert client.post("/api/care", json={**payload, "child_id": 9999}).status_code == 404
-        changed = client.patch(f"/api/care/{item['id']}", json={"kind": "poop", "amount_ml": None, "occurred_at": "2026-11-08T17:20"})
+        changed = client.patch(f"/api/care/{item['id']}", json={"kind": "poop", "occurred_at": "2026-11-08T17:20"})
         assert changed.status_code == 200 and changed.json()["kind"] == "poop"
         assert changed.json()["amount_ml"] is None
         disabled = client.post("/api/care/transcribe", files={"file": ("voice.m4a", b"audio", "audio/mp4")})
