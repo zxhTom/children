@@ -97,3 +97,15 @@ class GrowthRecord(Base):
     height_cm = Column(Float, nullable=True)
     head_cm = Column(Float, nullable=True)
     note = Column(String(300), nullable=True)
+
+
+class CareEvent(Base):
+    __tablename__ = "care_events"
+
+    id = Column(Integer, primary_key=True)
+    child_id = Column(Integer, ForeignKey("children.id"), nullable=False, index=True)
+    kind = Column(String(20), nullable=False)
+    occurred_at = Column(DateTime, nullable=False, index=True)
+    amount_ml = Column(Integer, nullable=True)
+    note = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)

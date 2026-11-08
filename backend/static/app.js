@@ -292,7 +292,7 @@ function renderStory() {
     $('storyPreview').innerHTML = state.story ? storyHtml(state.story) : '';
     $('printRoot').innerHTML = $('storyPreview').innerHTML;
 }
-function render() { renderHeader(); renderOverview(); renderHandbook(); renderTimeline(); renderHealth(); renderGrowth(); renderStory(); }
+function render() { renderHeader(); renderOverview(); renderHandbook(); renderTimeline(); renderHealth(); renderGrowth(); renderStory(); if ($('careChild')) { renderCareChildren(); loadCare(); } }
 function switchTab(name) {
     document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.tab === name));
     document.querySelectorAll('.panel').forEach((panel) => panel.classList.toggle('active', panel.id === `panel-${name}`));
@@ -382,6 +382,7 @@ function bindEvents() {
     document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
     document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => switchTab(button.dataset.go)));
     $('childFilter').addEventListener('change', (event) => { state.childId = event.target.value === 'all' ? null : Number(event.target.value); state.handbookMonth = null; state.story = null; render(); });
+    if ($('careForm')) bindCare();
     $('handbookContent').addEventListener('change', (event) => {
         if (event.target.id === 'chapterJump') { state.handbookMonth = Number(event.target.value); renderHandbook(); }
     });
@@ -587,6 +588,145 @@ async function saveAssignment() {
     if (!childIds.length) throw new Error('请至少选择一个宝宝');
     await api(`/api/entries/${$('assignEntryId').value}`, jsonOptions('PATCH', { child_ids: childIds }));
     $('assignDialog').close(); state.story = null; await refresh(); toast('宝宝关联已更新');
+}
+
+const careNames = { feeding: '吃奶', poop: '臭臭', pee: '尿尿', sleep: '睡觉', wake: '醒了', other: '其他' };
+const careIcons = { feeding: '🍼', poop: '💩', pee: '💧', sleep: '☾', wake: '☀', other: '✦' };
+let careEvents = [];
+let careRecorder = null;
+let careStream = null;
+let careBrowserRecognition = null;
+let careRequest = 0;
+const localMinute = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+function renderCareChildren() {
+    const previous = $('careChild').value;
+    $('careChild').innerHTML = optionList();
+    if (state.childId !== null) $('careChild').value = String(state.childId);
+    else if (previous && childById(previous)) $('careChild').value = previous;
+}
+function setCareKind(kind) {
+    $('careKind').value = kind;
+    document.querySelectorAll('[data-care-kind]').forEach((button) => button.classList.toggle('selected', button.dataset.careKind === kind));
+    $('careAmountWrap').hidden = kind !== 'feeding';
+    if (kind !== 'feeding') $('careAmount').value = '';
+}
+function renderCareList() {
+    const counts = Object.fromEntries(Object.keys(careNames).map((kind) => [kind, careEvents.filter((event) => event.kind === kind).length]));
+    $('careSummary').innerHTML = `<div><strong>${careEvents.length}</strong><span>今日记录</span></div><div><strong>${counts.feeding}</strong><span>次吃奶</span></div><div><strong>${counts.poop}</strong><span>次臭臭</span></div><div><strong>${counts.pee}</strong><span>次尿尿</span></div>`;
+    $('careList').innerHTML = careEvents.length ? careEvents.map((event) => `<article class="care-item"><div class="care-item-icon ${event.kind}">${careIcons[event.kind]}</div><div class="care-item-body"><strong>${esc(careNames[event.kind])}${event.amount_ml ? ` · ${event.amount_ml} ml` : ''}</strong><p>${esc(event.note || '—')}</p></div><time>${esc(event.occurred_at.slice(11, 16))}</time><button class="minor-button" type="button" data-care-edit="${event.id}">修改</button></article>`).join('') : '<div class="care-empty">这一天还没有照护记录。点选右侧类型，记下第一件小事。</div>';
+}
+async function loadCare() {
+    if (!$('careChild')) return;
+    const childId = Number($('careChild').value);
+    if (!childId || !$('careDay').value) { careEvents = []; renderCareList(); return; }
+    const request = ++careRequest;
+    try {
+        const events = await api(`/api/care?child_id=${childId}&day=${$('careDay').value}`);
+        if (request !== careRequest) return;
+        careEvents = events; renderCareList();
+    } catch (error) { if (request === careRequest) toast(error.message, true); }
+}
+function resetCareForm() {
+    $('careForm').reset(); $('careEditId').value = ''; $('careFormTitle').textContent = '记下刚刚发生的事';
+    $('careSave').textContent = '保存记录'; $('careCancel').hidden = true;
+    $('careTime').value = localMinute(); $('careTranscriptWrap').hidden = true;
+    renderCareChildren(); setCareKind('feeding');
+}
+function editCare(id) {
+    const event = careEvents.find((item) => item.id === id);
+    if (!event) return;
+    $('careEditId').value = event.id; $('careChild').value = String(event.child_id);
+    $('careTime').value = event.occurred_at.slice(0, 16); setCareKind(event.kind);
+    $('careAmount').value = event.amount_ml ?? ''; $('careNote').value = event.note || '';
+    $('careFormTitle').textContent = '修改照护记录'; $('careSave').textContent = '保存修改'; $('careCancel').hidden = false;
+    $('careForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function saveCare() {
+    const id = $('careEditId').value;
+    const payload = { child_id: Number($('careChild').value), kind: $('careKind').value, occurred_at: $('careTime').value,
+        amount_ml: $('careKind').value === 'feeding' && $('careAmount').value ? Number($('careAmount').value) : null,
+        note: $('careNote').value.trim() || null };
+    await api(id ? `/api/care/${id}` : '/api/care', jsonOptions(id ? 'PATCH' : 'POST', payload));
+    if (dateOnly(payload.occurred_at) !== $('careDay').value) $('careDay').value = dateOnly(payload.occurred_at);
+    resetCareForm(); await loadCare(); toast(id ? '记录已修改' : '已记下这件小事');
+}
+function applyCareTranscript() {
+    const value = $('careTranscript').value.trim();
+    if (!value) return;
+    const kind = /便便|臭臭|大便|拉屎/.test(value) ? 'poop' : /尿尿|小便|尿布/.test(value) ? 'pee' : /醒了|起床/.test(value) ? 'wake' : /睡觉|睡着|入睡/.test(value) ? 'sleep' : /吃奶|喂奶|母乳|奶粉|喝奶/.test(value) ? 'feeding' : 'other';
+    setCareKind(kind);
+    const amount = value.match(/(\d{1,4})\s*(?:毫升|ml|mL)/);
+    if (kind === 'feeding' && amount) $('careAmount').value = amount[1];
+    const time = value.match(/(?:(凌晨|早上|上午|中午|下午|傍晚|晚上|夜里)\s*)?(\d{1,2})\s*(?:点|:|：|时)\s*(半|\d{1,2}分?)?/);
+    if (time) {
+        let hour = Number(time[2]);
+        if (['下午', '傍晚', '晚上', '夜里'].includes(time[1]) && hour < 12) hour += 12;
+        if (['凌晨', '早上', '上午'].includes(time[1]) && hour === 12) hour = 0;
+        const minute = time[3] === '半' ? 30 : Number((time[3] || '0').replace('分', ''));
+        if (hour < 24 && minute < 60) $('careTime').value = `${$('careTime').value.slice(0, 10)}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    }
+    $('careNote').value = value;
+    toast('已填入表单，请核对宝宝、时间和内容后保存');
+}
+async function toggleCareRecording() {
+    if (careBrowserRecognition) { careBrowserRecognition.stop(); careBrowserRecognition = null; return; }
+    if (careRecorder?.state === 'recording') { careRecorder.stop(); $('careRecord').disabled = true; $('careVoiceStatus').textContent = '正在识别，请稍候…'; return; }
+    try {
+        const status = await api('/api/care/voice-status');
+        if (!status.server_recognition) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) { toast('网页语音识别暂不可用，请使用 iOS 应用或手动填写', true); return; }
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'zh-CN'; recognition.interimResults = false; recognition.continuous = false;
+            recognition.onresult = (event) => {
+                $('careTranscript').value = event.results[0][0].transcript;
+                $('careTranscriptWrap').hidden = false;
+                $('careVoiceStatus').textContent = '识别完成，请核对文字并点“根据文字填写”。';
+            };
+            recognition.onerror = () => { toast('识别失败，请重试或手动填写', true); };
+            recognition.onend = () => { careBrowserRecognition = null; $('careRecord').textContent = '● 开始语音录入'; };
+            careBrowserRecognition = recognition; recognition.start();
+            $('careRecord').textContent = '■ 结束录音'; $('careVoiceStatus').textContent = '正在听，请说出照护内容。';
+            return;
+        }
+    } catch (error) { toast(error.message, true); return; }
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { toast('当前浏览器不支持录音，请使用新版 Safari 或 Chrome', true); return; }
+    try {
+        careStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mime = ['audio/mp4', 'audio/webm'].find((type) => MediaRecorder.isTypeSupported(type)) || '';
+        const chunks = [];
+        careRecorder = new MediaRecorder(careStream, mime ? { mimeType: mime } : {});
+        careRecorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+        careRecorder.onstop = async () => {
+            careStream.getTracks().forEach((track) => track.stop());
+            const form = new FormData();
+            form.append('file', new Blob(chunks, { type: mime || careRecorder.mimeType }), mime.includes('mp4') || careRecorder.mimeType.includes('mp4') ? 'care.mp4' : 'care.webm');
+            try {
+                const result = await api('/api/care/transcribe', { method: 'POST', body: form });
+                $('careTranscript').value = result.text; $('careTranscriptWrap').hidden = false;
+                $('careVoiceStatus').textContent = '识别完成，请核对文字并点“根据文字填写”。';
+            } catch (error) { toast(error.message, true); $('careVoiceStatus').textContent = '识别失败，可重试或手动填写。'; }
+            finally { $('careRecord').disabled = false; $('careRecord').textContent = '● 开始语音录入'; }
+        };
+        careRecorder.start(); $('careRecord').textContent = '■ 结束录音'; $('careVoiceStatus').textContent = '正在录音，再点一次结束。';
+    } catch (error) { toast('无法使用麦克风，请检查浏览器权限', true); }
+}
+function bindCare() {
+    $('careDay').value = today(); resetCareForm();
+    $('careDay').addEventListener('change', loadCare);
+    $('careChild').addEventListener('change', loadCare);
+    $('careToday').addEventListener('click', () => { $('careDay').value = today(); loadCare(); });
+    [['carePrev', -1], ['careNext', 1]].forEach(([id, delta]) => $(id).addEventListener('click', () => {
+        const day = new Date(`${$('careDay').value}T12:00:00`); day.setDate(day.getDate() + delta);
+        $('careDay').value = localMinute(day).slice(0, 10); loadCare();
+    }));
+    document.querySelectorAll('[data-care-kind]').forEach((button) => button.addEventListener('click', () => setCareKind(button.dataset.careKind)));
+    $('careForm').addEventListener('submit', (event) => submitForm(event, saveCare));
+    $('careCancel').addEventListener('click', resetCareForm);
+    $('careRecord').addEventListener('click', toggleCareRecording);
+    $('careApplyVoice').addEventListener('click', applyCareTranscript);
+    $('careList').addEventListener('click', (event) => { const button = event.target.closest('[data-care-edit]'); if (button) editCare(Number(button.dataset.careEdit)); });
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

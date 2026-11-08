@@ -168,3 +168,25 @@ class StoryRequest(BaseModel):
     from_date: date | None = None
     to_date: date | None = None
     title: str | None = Field(default=None, max_length=120)
+
+
+class CareCreate(BaseModel):
+    child_id: int
+    kind: Literal["feeding", "poop", "pee", "sleep", "wake", "other"]
+    occurred_at: datetime
+    amount_ml: int | None = Field(default=None, ge=1, le=2000)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class CareUpdate(BaseModel):
+    child_id: int | None = None
+    kind: Literal["feeding", "poop", "pee", "sleep", "wake", "other"] | None = None
+    occurred_at: datetime | None = None
+    amount_ml: int | None = Field(default=None, ge=1, le=2000)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class CareOut(CareCreate):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)

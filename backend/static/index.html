@@ -39,12 +39,36 @@
 
             <nav class="tabs" aria-label="页面栏目">
                 <button class="tab active" data-tab="overview" type="button">总览</button>
+                <button class="tab" data-tab="care" type="button">日常照护</button>
                 <button class="tab" data-tab="handbook" type="button">成长手册</button>
                 <button class="tab" data-tab="timeline" type="button">成长记录</button>
                 <button class="tab" data-tab="health" type="button">健康手册</button>
                 <button class="tab" data-tab="growth" type="button">生长曲线</button>
                 <button class="tab" data-tab="story" type="button">关键时刻 · 故事</button>
             </nav>
+
+            <section class="panel" id="panel-care">
+                <div class="section-heading"><div><span class="kicker">LITTLE DAILY MOMENTS</span><h2>日常照护</h2><p>吃奶、臭臭、尿尿和睡眠，精确记到几点几分。</p></div></div>
+                <div class="care-layout">
+                    <div class="care-main">
+                        <div class="surface care-daybar"><button id="carePrev" type="button" aria-label="前一天">‹</button><input id="careDay" type="date" aria-label="查看日期"><button id="careNext" type="button" aria-label="后一天">›</button><button class="button soft" id="careToday" type="button">今天</button></div>
+                        <div id="careSummary" class="care-summary"></div>
+                        <div id="careList" class="care-list"></div>
+                    </div>
+                    <form id="careForm" class="surface care-editor">
+                        <span class="kicker">A MOMENT AT A TIME</span><h3 id="careFormTitle">记下刚刚发生的事</h3>
+                        <input id="careEditId" type="hidden">
+                        <div class="field"><label for="careChild">宝宝</label><select id="careChild" required></select></div>
+                        <div class="care-quick" aria-label="选择照护类型"><button type="button" data-care-kind="feeding">🍼<span>吃奶</span></button><button type="button" data-care-kind="poop">💩<span>臭臭</span></button><button type="button" data-care-kind="pee">💧<span>尿尿</span></button><button type="button" data-care-kind="sleep">☾<span>睡觉</span></button><button type="button" data-care-kind="wake">☀<span>醒了</span></button><button type="button" data-care-kind="other">✦<span>其他</span></button></div>
+                        <input id="careKind" type="hidden" value="feeding">
+                        <div class="form-row"><div class="field grow"><label for="careTime">发生时间</label><input id="careTime" type="datetime-local" required></div><div class="field grow" id="careAmountWrap"><label for="careAmount">奶量 · ml <span class="optional">选填</span></label><input id="careAmount" type="number" min="1" max="2000" step="1" placeholder="例如 120"></div></div>
+                        <div class="field"><label for="careNote">补充说明 <span class="optional">选填</span></label><textarea id="careNote" maxlength="500" rows="2" placeholder="例如：左侧母乳 15 分钟，或便便颜色"></textarea></div>
+                        <div class="care-voice"><button class="button soft" id="careRecord" type="button">● 开始语音录入</button><span id="careVoiceStatus" role="status">说出“下午三点半吃奶 120 毫升”，识别后可修改。</span></div>
+                        <div id="careTranscriptWrap" class="field" hidden><label for="careTranscript">识别文字 · 请核对</label><textarea id="careTranscript" rows="2"></textarea><button class="inline-action" id="careApplyVoice" type="button">根据文字填写 →</button></div>
+                        <div class="care-form-actions"><button class="button ghost" id="careCancel" type="button" hidden>取消修改</button><button class="button primary" id="careSave" type="submit">保存记录</button></div>
+                    </form>
+                </div>
+            </section>
 
             <section class="panel active" id="panel-overview">
                 <div id="unassignedBanner" class="notice" hidden></div>

@@ -1,4 +1,6 @@
 import calendar
+import io
+import os
 from collections import OrderedDict
 from datetime import date, datetime, timedelta
 
@@ -12,6 +14,82 @@ from . import import_csv, models, schemas
 from .database import get_db
 
 router = APIRouter(prefix="/api")
+
+
+@router.get("/care/voice-status")
+def care_voice_status():
+    return {"server_recognition": bool(os.environ.get("OPENAI_API_KEY"))}
+
+
+@router.get("/care", response_model=list[schemas.CareOut])
+def list_care(child_id: int, day: date, db: Session = Depends(get_db)):
+    require_child(db, child_id)
+    start = datetime.combine(day, datetime.min.time())
+    return (db.query(models.CareEvent)
+            .filter(models.CareEvent.child_id == child_id, models.CareEvent.occurred_at >= start,
+                    models.CareEvent.occurred_at < start + timedelta(days=1))
+            .order_by(models.CareEvent.occurred_at.desc(), models.CareEvent.id.desc()).all())
+
+
+@router.post("/care", response_model=schemas.CareOut)
+def create_care(payload: schemas.CareCreate, db: Session = Depends(get_db)):
+    require_child(db, payload.child_id)
+    event = models.CareEvent(**payload.model_dump())
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+@router.patch("/care/{event_id}", response_model=schemas.CareOut)
+def update_care(event_id: int, payload: schemas.CareUpdate, db: Session = Depends(get_db)):
+    event = db.get(models.CareEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="照护记录不存在")
+    updates = payload.model_dump(exclude_unset=True)
+    if any(updates.get(key) is None for key in ("child_id", "kind", "occurred_at") if key in updates):
+        raise HTTPException(status_code=422, detail="宝宝、类型和时间不能为空")
+    if "child_id" in updates:
+        require_child(db, updates["child_id"])
+    for key, value in updates.items():
+        setattr(event, key, value)
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+@router.delete("/care/{event_id}", status_code=204)
+def delete_care(event_id: int, db: Session = Depends(get_db)):
+    event = db.get(models.CareEvent, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="照护记录不存在")
+    db.delete(event)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/care/transcribe")
+async def transcribe_care(file: UploadFile = File(...)):
+    from openai import AsyncOpenAI
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise HTTPException(status_code=503, detail="语音识别尚未配置，请先设置 OPENAI_API_KEY")
+    filename = (file.filename or "").lower()
+    if not filename.endswith((".m4a", ".mp3", ".mp4", ".wav", ".webm")):
+        raise HTTPException(status_code=422, detail="请上传 m4a、mp3、mp4、wav 或 webm 录音")
+    data = await file.read(10 * 1024 * 1024 + 1)
+    if not data or len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=422, detail="录音需小于 10 MB")
+    audio = io.BytesIO(data)
+    audio.name = filename
+    try:
+        result = await AsyncOpenAI().audio.transcriptions.create(
+            model="gpt-transcribe", file=audio, languages=["zh-cn"],
+            keywords=["吃奶", "喂奶", "母乳", "配方奶", "便便", "臭臭", "尿尿", "换尿布", "睡觉", "醒了"],
+            prompt="这是一位家长口述宝宝的日常照护记录。请准确保留时间、毫升数、吃奶、便便、尿尿等原话。",
+        )
+    except Exception:
+        raise HTTPException(status_code=502, detail="语音识别暂时失败，请稍后重试")
+    return {"text": result.text.strip()}
 
 
 def require_child(db: Session, child_id: int) -> models.Child:
