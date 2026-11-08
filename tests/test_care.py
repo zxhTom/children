@@ -20,6 +20,8 @@ def main():
         assert client.get("/api/care?child_id=1&day=2026-11-08").status_code == 401
         assert client.post("/api/care/transcribe", files={"file": ("voice.m4a", b"audio")}).status_code == 401
         assert client.get("/api/care/voice-status").status_code == 401
+        for path in ("/assets/manifest.webmanifest", "/assets/app-icon-192.png"):
+            assert client.get(path, follow_redirects=False).status_code == 303
         assert client.post("/api/login", json={"username": "admin", "password": "test-password"}).status_code == 200
         child_id = client.get("/api/children").json()[0]["id"]
         assert client.get("/api/care/voice-status").json() == {"server_recognition": False}
@@ -40,6 +42,8 @@ def main():
         assert client.delete(f"/api/care/{item['id']}").status_code == 204
         assert client.get(f"/api/care?child_id={child_id}&day=2026-11-08").json() == []
         assert client.get("/assets/app.js").status_code == 200
+        assert client.get("/assets/manifest.webmanifest").json()["display"] == "standalone"
+        assert client.get("/assets/app-icon-192.png").content.startswith(b"\x89PNG")
         client.post("/api/logout")
         assert client.get("/assets/app.js", follow_redirects=False).status_code == 303
     print("care flow passed")

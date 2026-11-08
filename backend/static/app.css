@@ -149,3 +149,7 @@ h1,h2 { font-family:"Noto Serif CJK SC","Songti SC","SimSun",serif; }
 .care-editor [hidden] { display:none !important; }
 @media(max-width:850px) { .care-layout { grid-template-columns:1fr; }.care-editor { position:static; grid-row:1; }.care-summary { margin-top:16px; } }
 @media(max-width:480px) { .care-summary { gap:5px; }.care-summary > div { padding:11px 4px; }.care-summary strong { font-size:18px; }.care-summary span { font-size:10px; }.care-daybar { gap:6px; padding:10px; }.care-daybar .button { padding:8px 10px; }.care-item { gap:8px; padding:12px 10px; }.care-item-icon { width:36px; height:36px; }.care-item time { font-size:13px; } }
+@media (display-mode:standalone) {
+    .app-shell { padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); }
+    .toast { bottom:calc(24px + env(safe-area-inset-bottom)); }
+}

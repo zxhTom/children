@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "家庭时光机 · 成长手册",
+  "short_name": "家庭时光机",
+  "description": "家人的成长手册与日常照护记录",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f9f7f2",
+  "theme_color": "#f9f7f2",
+  "icons": [
+    { "src": "/assets/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/assets/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
