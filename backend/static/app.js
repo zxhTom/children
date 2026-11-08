@@ -656,14 +656,24 @@ function applyCareTranscript() {
     if (!value) return;
     const kind = /便便|臭臭|大便|拉屎/.test(value) ? 'poop' : /尿尿|小便|尿布/.test(value) ? 'pee' : /醒了|起床/.test(value) ? 'wake' : /睡觉|睡着|入睡/.test(value) ? 'sleep' : /吃奶|喂奶|母乳|奶粉|喝奶/.test(value) ? 'feeding' : 'other';
     setCareKind(kind);
-    const amount = value.match(/(\d{1,4})\s*(?:毫升|ml|mL)/);
-    if (kind === 'feeding' && amount) $('careAmount').value = amount[1];
-    const time = value.match(/(?:(凌晨|早上|上午|中午|下午|傍晚|晚上|夜里)\s*)?(\d{1,2})\s*(?:点|:|：|时)\s*(半|\d{1,2}分?)?/);
+    const parseChineseNumber = (input) => {
+        if (/^\d+$/.test(input)) return Number(input);
+        const digits = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+        let total = 0; let current = 0;
+        for (const char of input) {
+            if (char === '百' || char === '十') { total += (current || 1) * (char === '百' ? 100 : 10); current = 0; }
+            else if (char in digits) current = current * 10 + digits[char];
+        }
+        return total + current;
+    };
+    const amount = value.match(/([\d零一二两三四五六七八九十百]{1,7})\s*(?:毫升|ml|mL)/);
+    if (kind === 'feeding' && amount) $('careAmount').value = parseChineseNumber(amount[1]);
+    const time = value.match(/(?:(凌晨|早上|上午|中午|下午|傍晚|晚上|夜里)\s*)?([\d零一二两三四五六七八九十]{1,3})\s*(?:点|:|：|时)\s*(半|[\d零一二两三四五六七八九十]{1,3}分?)?/);
     if (time) {
-        let hour = Number(time[2]);
+        let hour = parseChineseNumber(time[2]);
         if (['下午', '傍晚', '晚上', '夜里'].includes(time[1]) && hour < 12) hour += 12;
         if (['凌晨', '早上', '上午'].includes(time[1]) && hour === 12) hour = 0;
-        const minute = time[3] === '半' ? 30 : Number((time[3] || '0').replace('分', ''));
+        const minute = time[3] === '半' ? 30 : parseChineseNumber((time[3] || '0').replace('分', ''));
         if (hour < 24 && minute < 60) $('careTime').value = `${$('careTime').value.slice(0, 10)}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
     }
     $('careNote').value = value;

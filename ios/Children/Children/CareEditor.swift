@@ -157,12 +157,13 @@ struct CareEditor: View {
         else if text.contains("睡觉") || text.contains("睡着") { kind = "sleep" }
         else if text.contains("奶") { kind = "feeding" }
         else { kind = "other" }
-        if let match = text.range(of: #"\d{1,4}\s*(毫升|ml|mL)"#, options: .regularExpression) {
-            amount = String(text[match].prefix { $0.isNumber })
+        if let match = text.range(of: #"[\d零一二两三四五六七八九十百]{1,7}\s*(毫升|ml|mL)"#, options: .regularExpression) {
+            let raw = String(text[match].prefix { $0.isNumber || "零一二两三四五六七八九十百".contains($0) })
+            amount = String(spokenNumber(raw))
         }
-        if let match = text.range(of: #"(凌晨|早上|上午|中午|下午|傍晚|晚上|夜里)?\s*\d{1,2}(点|:|：|时)(半|\d{1,2}分?)?"#, options: .regularExpression) {
+        if let match = text.range(of: #"(凌晨|早上|上午|中午|下午|傍晚|晚上|夜里)?\s*[\d零一二两三四五六七八九十]{1,3}(点|:|：|时)(半|[\d零一二两三四五六七八九十]{1,3}分?)?"#, options: .regularExpression) {
             let spoken = String(text[match])
-            let numbers = spoken.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+            let numbers = spoken.split(whereSeparator: { !$0.isNumber && !"零一二两三四五六七八九十".contains($0) }).map { spokenNumber(String($0)) }
             if let first = numbers.first {
                 var hour = first
                 if ["下午", "傍晚", "晚上", "夜里"].contains(where: spoken.contains) && hour < 12 { hour += 12 }
@@ -172,6 +173,17 @@ struct CareEditor: View {
             }
         }
         note = text
+    }
+
+    private func spokenNumber(_ text: String) -> Int {
+        if let value = Int(text) { return value }
+        let digits: [Character: Int] = ["零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9]
+        var total = 0; var current = 0
+        for char in text {
+            if char == "百" || char == "十" { total += (current == 0 ? 1 : current) * (char == "百" ? 100 : 10); current = 0 }
+            else if let value = digits[char] { current = current * 10 + value }
+        }
+        return total + current
     }
 
     private func save() async {
