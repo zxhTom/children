@@ -3,12 +3,13 @@ name: Build iPhone IPA
 on:
   workflow_dispatch:
   push:
+    branches: [master]
     paths:
       - 'ios/Children/**'
       - '.github/workflows/build-ios.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   iphone:
@@ -47,6 +48,21 @@ jobs:
           (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/Children-unsigned.ipa" Payload)
           unzip -tq "$GITHUB_WORKSPACE/Children-unsigned.ipa"
           shasum -a 256 "$GITHUB_WORKSPACE/Children-unsigned.ipa"
+      - name: Deliver encrypted IPA to repository owner
+        shell: bash
+        run: |
+          set -euo pipefail
+          openssl cms -encrypt -binary -aes256 \
+            -in "$GITHUB_WORKSPACE/Children-unsigned.ipa" \
+            -out "$RUNNER_TEMP/Children-unsigned.ipa.cms" -outform DER \
+            ios/Children/ci-delivery-cert.pem
+          git config user.name 'children-build-bot'
+          git config user.email 'children-build-bot@users.noreply.github.com'
+          git worktree add -B ipa-delivery "$RUNNER_TEMP/ipa-delivery"
+          cp "$RUNNER_TEMP/Children-unsigned.ipa.cms" "$RUNNER_TEMP/ipa-delivery/Children-unsigned.ipa.cms"
+          git -C "$RUNNER_TEMP/ipa-delivery" add Children-unsigned.ipa.cms
+          git -C "$RUNNER_TEMP/ipa-delivery" commit -m "Encrypted iPhone IPA for ${GITHUB_SHA::7}"
+          git -C "$RUNNER_TEMP/ipa-delivery" push --force origin ipa-delivery
       - uses: actions/upload-artifact@v4
         with:
           name: Children-iPhone-IPA
